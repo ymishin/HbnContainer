@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!DOCTYPE ivy-module [<!ENTITY vaadin.version "7.0.0.beta4">]>
+<ivy-module version="2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd">
+	<info organisation="com.vaadin.data.hbnutil" module="HbnContainer" revision="2.0.0" status="release" />
+	<configurations>
+		<conf name="default" />
+		<conf name="widgetset-compile" />
+	</configurations>
+	<dependencies>
+		<!-- Vaadin -->
+		<dependency org="com.vaadin" name="vaadin-server" rev="&vaadin.version;" conf="default->default" />
+		<dependency org="com.vaadin" name="vaadin-themes" rev="&vaadin.version;" />
+		<dependency org="com.vaadin" name="vaadin-client-compiled" rev="&vaadin.version;" />
+		<dependency org="com.vaadin" name="vaadin-client" rev="&vaadin.version;" />
+		<dependency org="com.vaadin" name="vaadin-client-compiler" rev="&vaadin.version;" conf="widgetset-compile->default" />
+
+		<!-- Hibernate -->
+		<dependency org="org.hibernate" name="hibernate-core" rev="4.1.7.Final"/>
+		<!-- <dependency org="org.hibernate" name="hibernate-entitymanager" rev="4.1.7.Final"/> -->
+		<dependency org="org.hibernate" name="hibernate-c3p0" rev="4.1.7.Final"/>
+		
+		<!-- SLF4J / Log4j -->
+		<dependency org="org.slf4j" name="slf4j-log4j12" rev="1.6.6"/>
+		<dependency org="log4j" name="log4j" rev="1.2.17"/>
+		
+		<!-- HSQLDB -->
+		<!-- <dependency org="org.hsqldb" name="hsqldb" rev="2.2.8"/> -->
+		
+		<!-- HbnContainer -->
+		<!-- <dependency org="com.vaadin.data.hbnutil" name="HbnContainer" rev="2.0.0"/> -->
+	</dependencies>
+</ivy-module>
+    
