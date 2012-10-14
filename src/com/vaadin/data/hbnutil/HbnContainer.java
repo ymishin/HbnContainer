@@ -1,3 +1,16 @@
+/*
+ * Copyright 2012, Gary Piercey, All Rights Reserved.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * 
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations under the License.
+ */
+
 package com.vaadin.data.hbnutil;
 
 import java.io.Serializable;
@@ -63,7 +76,7 @@ import com.vaadin.data.util.filter.UnsupportedFilterException;
  * p_r_p_185834411_title=Using%20Hibernate%20with%20Vaadin for a working example application.
  */
 public class HbnContainer<T> implements Container, Container.Indexed, Container.Sortable,
-	Container.Filterable, Container.Hierarchical, Container.ItemSetChangeNotifier, Container.Ordered
+		Container.Filterable, Container.Hierarchical, Container.ItemSetChangeNotifier, Container.Ordered
 {
 	private static final int REFERENCE_CLEANUP_INTERVAL = 2000;
 	private static final long serialVersionUID = -6410337120924382057L;
@@ -222,7 +235,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 							}
 							catch (NoSuchFieldException ex)
 							{
-								throw new RuntimeException("Could not find the type of specified container property.", ex);
+								throw new RuntimeException("Could not find the type of specified container property.",
+										ex);
 							}
 						}
 					}
@@ -246,7 +260,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 					 */
 					// TODO clean, optimize, review, this could be optimized
 					// among similar properties
-					ClassMetadata classMetadata2 = sessionFactory.getClassMetadata(classMetadata.getPropertyType(propertyName).getReturnedClass());
+					ClassMetadata classMetadata2 = sessionFactory.getClassMetadata(classMetadata.getPropertyType(
+							propertyName).getReturnedClass());
 					return classMetadata2.getIdentifierType().getReturnedClass();
 
 				}
@@ -280,7 +295,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 						String name = propertyNames[i];
 						if (name.equals(propertyName))
 						{
-							Object id = classMetadata.getIdentifier(pojo, (SessionImplementor) sessionFactory.getCurrentSession());
+							Object id = classMetadata.getIdentifier(pojo,
+									(SessionImplementor) sessionFactory.getCurrentSession());
 							return idType.getPropertyValue(id, i, EntityMode.POJO);
 						}
 					}
@@ -332,7 +348,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 
 					ClassMetadata classMetadata2 = sessionFactory.getClassMetadata(propertyTypeClass);
 
-					Serializable identifier = classMetadata2.getIdentifier(propertyValue, (SessionImplementor) sessionFactory.getCurrentSession());
+					Serializable identifier = classMetadata2.getIdentifier(propertyValue,
+							(SessionImplementor) sessionFactory.getCurrentSession());
 					return identifier;
 				}
 			}
@@ -381,7 +398,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 								String name = propertyNames[i];
 								if (name.equals(propertyName))
 								{
-									Object id = classMetadata.getIdentifier(pojo, (SessionImplementor) sessionFactory.getCurrentSession());
+									Object id = classMetadata.getIdentifier(pojo,
+											(SessionImplementor) sessionFactory.getCurrentSession());
 									Object[] values = idType.getPropertyValues(id, EntityMode.POJO);
 									values[i] = value;
 									idType.setPropertyValues(id, values, EntityMode.POJO);
@@ -400,7 +418,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 								// properly
 								Field declaredField = entityType.getDeclaredField(propertyName);
 								java.lang.reflect.Type genericType = declaredField.getGenericType();
-								java.lang.reflect.Type[] actualTypeArguments = ((ParameterizedType) genericType).getActualTypeArguments();
+								java.lang.reflect.Type[] actualTypeArguments = ((ParameterizedType) genericType)
+										.getActualTypeArguments();
 
 								java.lang.reflect.Type assosiatedType = actualTypeArguments[0];
 								String typestring = assosiatedType.toString().substring(6);
@@ -410,7 +429,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 								 * properly.
 								 */
 								@SuppressWarnings("unchecked")
-								Collection<Object> pojoCollection = (Collection<Object>) classMetadata.getPropertyValue(pojo, propertyName);
+								Collection<Object> pojoCollection = (Collection<Object>) classMetadata
+										.getPropertyValue(pojo, propertyName);
 								if (pojoCollection == null)
 								{
 									pojoCollection = new HashSet<Object>();
@@ -445,8 +465,10 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 								/*
 								 * Property value is identifier, convert to the referenced type
 								 */
-								Class<?> referencedType = classMetadata.getPropertyType(propertyName).getReturnedClass();
-								Object object = sessionFactory.getCurrentSession().get(referencedType, (Serializable) value);
+								Class<?> referencedType = classMetadata.getPropertyType(propertyName)
+										.getReturnedClass();
+								Object object = sessionFactory.getCurrentSession().get(referencedType,
+										(Serializable) value);
 								classMetadata.setPropertyValue(pojo, propertyName, object);
 								// TODO check if these are needed
 								sessionFactory.getCurrentSession().merge(object);
@@ -542,14 +564,14 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			public void addValueChangeListener(ValueChangeListener listener)
 			{
 				// TODO Auto-generated method stub
-				
+
 			}
 
 			@Override
 			public void removeValueChangeListener(ValueChangeListener listener)
 			{
 				// TODO Auto-generated method stub
-				
+
 			}
 
 		}
@@ -622,6 +644,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	private int loadCount;
 
 	private SessionFactory sessionFactory;
+
 	/**
 	 * Creates a new instance of HbnContainer, listing all object of given type from database.
 	 * 
@@ -644,7 +667,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * 
 	 * @see Container#addContainerProperty(Object, Class, Object)
 	 */
-	public boolean addContainerProperty(Object propertyId, Class<?> type, Object defaultValue) throws UnsupportedOperationException
+	public boolean addContainerProperty(Object propertyId, Class<?> type, Object defaultValue)
+			throws UnsupportedOperationException
 	{
 		boolean propertyExists = true;
 		try
@@ -862,7 +886,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		if (++loadCount % REFERENCE_CLEANUP_INTERVAL == 0)
 		{
 			Set<Entry<Object, WeakReference<EntityItem<T>>>> entries = itemCache.entrySet();
-			for (Iterator<Entry<Object, WeakReference<EntityItem<T>>>> iterator = entries.iterator(); iterator.hasNext();)
+			for (Iterator<Entry<Object, WeakReference<EntityItem<T>>>> iterator = entries.iterator(); iterator
+					.hasNext();)
 			{
 				Entry<Object, WeakReference<EntityItem<T>>> entry = iterator.next();
 				if (entry.getValue().get() == null)
@@ -1493,7 +1518,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	{
 		if (addedProperties.containsKey(containerFilter.getPropertyId()))
 		{
-			throw new UnsupportedOperationException("HbnContainer does not support filterig properties not mapped by Hibernate");
+			throw new UnsupportedOperationException(
+					"HbnContainer does not support filterig properties not mapped by Hibernate");
 		}
 		else
 		{
