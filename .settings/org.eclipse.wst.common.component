@@ -3,6 +3,7 @@
     <wb-module deploy-name="HbnContainer">
         <wb-resource deploy-path="/" source-path="/WebContent" tag="defaultRootSource"/>
         <wb-resource deploy-path="/WEB-INF/classes" source-path="/src"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/tests"/>
         <property name="context-root" value="HbnContainer"/>
         <property name="java-output-path" value="/HbnContainer/build/classes"/>
     </wb-module>

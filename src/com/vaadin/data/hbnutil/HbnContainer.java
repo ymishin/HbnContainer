@@ -13,7 +13,9 @@
 
 package com.vaadin.data.hbnutil;
 
+import java.io.PrintWriter;
 import java.io.Serializable;
+import java.io.StringWriter;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -48,6 +50,7 @@ import org.hibernate.type.Type;
 import com.vaadin.data.Container;
 import com.vaadin.data.Item;
 import com.vaadin.data.Property;
+import com.vaadin.data.hbnutil.HbnContainer.EntityItem.EntityItemProperty;
 import com.vaadin.data.util.MethodProperty;
 import com.vaadin.data.util.converter.Converter.ConversionException;
 import com.vaadin.data.util.filter.SimpleStringFilter;
@@ -80,7 +83,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 {
 	private static final int REFERENCE_CLEANUP_INTERVAL = 2000;
 	private static final long serialVersionUID = -6410337120924382057L;
-	private Logger logger;
+	private Logger logger = LoggerFactory.getLogger(HbnContainer.class);
 
 	/**
 	 * Item wrappping a Hibernate mapped entity object. EntityItems are generally instantiated automatically by
@@ -633,7 +636,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	private HashSet<ContainerFilter> filters;
 
 	/** Caches weak references to items, in order to conserve memory. */
-	private final HashMap<Object, WeakReference<EntityItem<T>>> itemCache = new HashMap<Object, WeakReference<EntityItem<T>>>();
+	private final HashMap<Object, WeakReference<EntityItem<T>>> entityCache = new HashMap<Object, WeakReference<EntityItem<T>>>();
 
 	/** A map of added javabean property names to their respective types */
 	private final Map<String, Class<?>> addedProperties = new HashMap<String, Class<?>>();
@@ -645,168 +648,212 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 
 	private SessionFactory sessionFactory;
 
+	
+	
+	
 	/**
-	 * Creates a new instance of HbnContainer, listing all object of given type from database.
-	 * 
-	 * @param entityType
-	 *            Entity class to be listed in container.
-	 * @param sessionMgr
-	 *            interface via Hibernate session is fetched
+	 * Constructor creates a new instance of HbnContainer.
 	 */
 	public HbnContainer(Class<T> entityType, SessionFactory sessionFactory)
 	{
 		this.entityType = entityType;
 		this.sessionFactory = sessionFactory;
-		this.classMetadata = this.sessionFactory.getClassMetadata(entityType);
-		this.logger = LoggerFactory.getLogger(this.getClass());
+		this.classMetadata = sessionFactory.getClassMetadata(entityType);
 	}
 
 	/**
-	 * HbnContainer automatically adds all fields that are mapped by Hibernate to DB. With this method one can add a
-	 * javabean property to the container that is contained on pojo but not hibernate-mapped.
-	 * 
-	 * @see Container#addContainerProperty(Object, Class, Object)
+	 * This is an internal utility method that takes an exception, extracts the stack trace and creates a string from
+	 * the stack trace.
 	 */
-	public boolean addContainerProperty(Object propertyId, Class<?> type, Object defaultValue)
+	private String StackToString(Throwable exception)
+	{
+		try
+		{
+			final StringWriter stringWriter = new StringWriter();
+			final PrintWriter printWriter = new PrintWriter(stringWriter);
+			exception.printStackTrace(printWriter);
+			return stringWriter.toString();
+		}
+		catch (Exception e)
+		{
+			logger.error(e.toString());
+			return "Stack Trace Unavailable";
+		}
+	}
+
+	/**
+	 * Adds a new Property to all Items in the Container. The Property ID, data type and default value of the new
+	 * Property are given as parameters. This functionality is optional.
+	 * 
+	 * HbnContainer automatically adds all fields that are mapped by Hibernate to the database. With this method
+	 * we can add a bean property to the container that is contained in the pojo but not hibernate-mapped.
+	 */
+	@Override
+	public boolean addContainerProperty(Object propertyId, Class<?> classType, Object defaultValue)
 			throws UnsupportedOperationException
 	{
 		boolean propertyExists = true;
+
 		try
 		{
+			// TODO: this is a little hackish, try to find a cleaner way.
+			// Determine if the property exists and if not, determine if it can be created.
 			new MethodProperty<Object>(this.entityType.newInstance(), propertyId.toString());
 		}
-		catch (InstantiationException ex)
+		catch (Exception e)
 		{
-			ex.printStackTrace();
+			logger.debug("Note: this is not an error: " + StackToString(e));
 			propertyExists = false;
 		}
-		catch (IllegalAccessException ex)
-		{
-			ex.printStackTrace();
-			propertyExists = false;
-		}
-		addedProperties.put(propertyId.toString(), type);
+
+		addedProperties.put(propertyId.toString(), classType);
 		return propertyExists;
 	}
 
 	/**
-	 * HbnContainer specific method to persist newly created entity.
-	 * 
-	 * @param entity
-	 *            the unsaved entity object
-	 * @return the identifier for newly persisted entity
+	 * This is an HbnContainer specific method to persist a newly created entity. This method will trigger a cache clear
+	 * and will also fire an item set change event.
 	 */
 	public Serializable saveEntity(T entity)
 	{
-		// insert into DB
-		this.sessionFactory.getCurrentSession().save(entity);
+		final Session session = sessionFactory.getCurrentSession();
+		final Serializable entityId = session.save(entity);
+
 		clearInternalCache();
 		fireItemSetChange();
-		return (Serializable) getIdForPojo(entity);
+
+		return entityId;
 	}
 
 	/**
-	 * HbnContainer specific method to update entity.
-	 * 
-	 * @param entity
-	 *            to update
-	 * @return the identifier of the updated entity
+	 * This is an HbnContainer specific method to update an entity. This method takes care of updating the cache
+	 * appropriately as well as firing value change events when necessary.
 	 */
 	public Serializable updateEntity(T entity)
 	{
-		// update DB
-		this.sessionFactory.getCurrentSession().update(entity);
+		final Session session = sessionFactory.getCurrentSession();
+		session.update(entity);
 
-		EntityItem<T> item = null;
-		Serializable itemId = (Serializable) getIdForPojo(entity);
+		EntityItem<T> cachedEntity = null;
+		final Serializable entityId = (Serializable) getIdForPojo(entity);
 
-		if (itemCache != null)
+		if (entityCache != null) // Refresh the entity cache
 		{
-			// refresh itemCache
-			WeakReference<EntityItem<T>> weakReference = itemCache.get(itemId);
+			final WeakReference<EntityItem<T>> weakReference = entityCache.get(entityId);
+
 			if (weakReference != null)
 			{
-				item = weakReference.get();
-				if (item != null)
-				{ // may be already collected, but not cleaned
-					item.pojo = entity;
-				}
+				cachedEntity = weakReference.get();
+
+				if (cachedEntity != null) // May be already collected but not cleaned
+					cachedEntity.pojo = entity;
 			}
 		}
 
-		if (item != null)
-		{ // if it was in cache, it might be rendered
-			// fire change events on this item, properties might
-			// have changed
-			for (Object id : item.getItemPropertyIds())
+		if (cachedEntity != null) // If it was in cache it might be rendered
+		{
+			for (Object propertyId : cachedEntity.getItemPropertyIds())
 			{
-				Property<?> p = item.getItemProperty(id);
-				if (p instanceof EntityItem.EntityItemProperty)
+				// fire change events on this item, properties might have changed
+				final Property<?> property = cachedEntity.getItemProperty(propertyId);
+
+				if (property instanceof EntityItem.EntityItemProperty)
 				{
 					@SuppressWarnings("rawtypes")
-					EntityItem.EntityItemProperty ep = (EntityItem.EntityItemProperty) p;
-					ep.fireValueChange();
+					final EntityItemProperty entityProperty = (EntityItemProperty) property;
+					entityProperty.fireValueChange();
 				}
 			}
 		}
 
-		return itemId;
+		return entityId;
 	}
 
+	/**
+	 * Creates a new Item into the Container and assigns it an automatic ID. The new ID is returned, or null if the
+	 * operation fails. After a successful call you can use the getItemmethod to fetch the Item. This functionality is
+	 * optional.
+	 */
+	@Override
 	public Object addItem() throws UnsupportedOperationException
 	{
-		Object o;
 		try
 		{
-			// create a new instance of entity type
-			o = entityType.newInstance();
-			// insert into DB
-			this.sessionFactory.getCurrentSession().save(o);
-			// we need to clear internal caches of HbnContainer
+			final Object entity = entityType.newInstance();
+			final Session session = sessionFactory.getCurrentSession();
+			final Object entityId = session.save(entity);
+			
 			clearInternalCache();
-			// notify listeners that a new item has been added, will cause eg.
-			// Table refresh
 			fireItemSetChange();
-			return getIdForPojo(o);
-		}
-		catch (InstantiationException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-		catch (IllegalAccessException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
 
-	public Item addItem(Object itemId) throws UnsupportedOperationException
-	{
-		// Expecting autogenerated identifiers
-		throw new UnsupportedOperationException();
-	}
-
-	public boolean containsId(Object itemId)
-	{
-		// test if entity can be found with given id
-		try
-		{
-			return (this.sessionFactory.getCurrentSession().get(entityType, (Serializable) itemId) != null);
+			return entityId;
 		}
 		catch (Exception e)
 		{
-			// this should not happen if used correctly
-			e.printStackTrace();
+			logger.error(StackToString(e));
+			return null;
+		}
+	}
+
+	/**
+	 * Creates a new Item with the given ID in the Container. The new Item is returned, and it is ready to have its
+	 * Properties modified. Returns null if the operation fails or the Container already contains a Item with the given
+	 * ID. This functionality is optional.
+	 * 
+	 * Note that in this implementation we are expecting auto-generated identifiers so this method is not implemented.
+	 */
+	@Override
+	public Item addItem(Object itemId) throws UnsupportedOperationException
+	{
+		throw new UnsupportedOperationException();
+	}
+
+	/**
+	 * Tests if the Container contains the specified Item. Filtering can hide items so that they will not be visible
+	 * through the container API, and this method should respect visibility of items (i.e. only indicate visible items
+	 * as being in the container) if feasible for the container.
+	 */
+	@Override
+	public boolean containsId(Object entityId)
+	{
+		try
+		{
+			final Session session = sessionFactory.getCurrentSession();
+			final Object entity = session.get(entityType, (Serializable) entityId);
+			return (entity != null);
+		}
+		catch (Exception e)
+		{
+			logger.debug(StackToString(e)); // not an error
 			return false;
 		}
 	}
 
-	public Property<?> getContainerProperty(Object itemId, Object propertyId)
+	/**
+	 * Gets the Property identified by the given itemId and propertyId from the Container. If the Container does not
+	 * contain the item or it is filtered out, or the Container does not have the Property, null is returned.
+	 */
+	@Override
+	public Property<?> getContainerProperty(Object entityId, Object propertyId)
 	{
-		return getItem(itemId).getItemProperty(propertyId);
+		try
+		{
+			EntityItem<?> entity = getItem(entityId);
+			Property<?> property = entity.getItemProperty(propertyId);
+			return property;
+		}
+		catch (Exception e)
+		{
+			logger.debug(StackToString(e)); // not an error
+			return null;
+		}
 	}
 
+	/**
+	 * Gets the ID's of all Properties stored in the Container. The ID's cannot be modified through the returned
+	 * collection.
+	 */
+	@Override
 	public Collection<String> getContainerPropertyIds()
 	{
 		Collection<String> propertyIds = getSortableContainerPropertyIds();
@@ -814,67 +861,71 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		return propertyIds;
 	}
 
+	/**
+	 * This is an HbnContainer specific utility method that is used to retrieve the list of embedded property key
+	 * identifiers.
+	 */
 	private Collection<String> getEmbeddedKeyPropertyIds()
 	{
-		ArrayList<String> embeddedKeyPropertyIds = new ArrayList<String>();
-		Type identifierType = classMetadata.getIdentifierType();
+		final ArrayList<String> embeddedKeyPropertyIds = new ArrayList<String>();
+		final Type identifierType = classMetadata.getIdentifierType();
+
 		if (identifierType.isComponentType())
 		{
-			ComponentType idComponent = (ComponentType) identifierType;
-			String[] propertyNameArray = idComponent.getPropertyNames();
+			final ComponentType idComponent = (ComponentType) identifierType;
+			final String[] propertyNameArray = idComponent.getPropertyNames();
+
 			if (propertyNameArray != null)
 			{
-				List<String> propertyNames = Arrays.asList(propertyNameArray);
+				final List<String> propertyNames = Arrays.asList(propertyNameArray);
 				embeddedKeyPropertyIds.addAll(propertyNames);
 			}
 		}
+		
 		return embeddedKeyPropertyIds;
 	}
 
-	public EntityItem<T> getItem(Object itemId)
+	/**
+	 * Gets the Item with the given Item ID from the Container. If the Container does not contain the requested Item,
+	 * null is returned. Containers should not return Items that are filtered out.
+	 */
+	@Override
+	public EntityItem<T> getItem(Object entityId)
 	{
-		EntityItem<T> item = null;
-		if (itemId != null)
-		{
-			item = loadItem((Serializable) itemId);
-		}
-		return item;
+		return loadEntity((Serializable)entityId);
 	}
 
 	/**
-	 * This method is used to fetch Items by id. Override this if you need customized EntityItems.
-	 * 
-	 * @param itemId
-	 * @return
+	 * This is an HbnContainer specific utility method and it is used to fetch Items by id. Override this if you need to
+	 * customize your query for EntityItems.
 	 */
-	protected EntityItem<T> loadItem(Serializable itemId)
+	protected EntityItem<T> loadEntity(Serializable entityId)
 	{
-		// clean up refQue if there are some items to clean up
+		if (entityId == null)
+			return null;
+		
 		cleanCache();
 
-		EntityItem<T> item;
-		// Search the itemCache if the entityitem is already loaded
-		WeakReference<EntityItem<T>> weakReference = itemCache.get(itemId);
+		EntityItem<T> entity;
+		final WeakReference<EntityItem<T>> weakReference = entityCache.get(entityId);
+
 		if (weakReference != null)
 		{
-			item = weakReference.get();
-			// still check if weakreference still contained the item (may be
-			// carbagecollected, but not cleand from cache map
-			if (item != null)
-			{
-				// return the previously instantiated entityitem
-				return item;
-			}
+			entity = weakReference.get();
+
+			if (entity != null)
+				return entity;
 		}
 
-		item = new EntityItem<T>(itemId);
-		itemCache.put(itemId, new WeakReference<EntityItem<T>>(item));
-		return item;
+		entity = new EntityItem<T>(entityId);
+		entityCache.put(entityId, new WeakReference<EntityItem<T>>(entity));
+
+		return entity;
 	}
 
 	/**
 	 * Cleans the itemCache of collected item references. This method run every now and then by
-	 * {@link #loadItem(Serializable)}, but may be run manually too.
+	 * {@link #loadEntity(Serializable)}, but may be run manually too.
 	 * 
 	 * <p>
 	 * TODO figure out if this is the best possible way to free the memory consumed by (empty) weak references and open
@@ -885,7 +936,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	{
 		if (++loadCount % REFERENCE_CLEANUP_INTERVAL == 0)
 		{
-			Set<Entry<Object, WeakReference<EntityItem<T>>>> entries = itemCache.entrySet();
+			Set<Entry<Object, WeakReference<EntityItem<T>>>> entries = entityCache.entrySet();
 			for (Iterator<Entry<Object, WeakReference<EntityItem<T>>>> iterator = entries.iterator(); iterator
 					.hasNext();)
 			{
@@ -1103,8 +1154,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * Return the ordering criteria in the order in which they should be applied. The composed order must be stable and
 	 * must include {@link #getNaturalOrder(boolean)} at the end.
 	 * 
-	 * @param flipOrder
-	 *            reverse the order if true
+	 * @param flipOrder reverse the order if true
 	 * @return List<Order> orders to apply, first item has the highest priority
 	 */
 	protected final List<Order> getOrder(boolean flipOrder)
@@ -1126,8 +1176,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * 
 	 * Can be overridden to customize item sort order.
 	 * 
-	 * @param flipOrder
-	 *            reverse the order if true
+	 * @param flipOrder reverse the order if true
 	 * @return List<Order> orders to apply, first item has the highest priority
 	 */
 	protected List<Order> getDefaultOrder(boolean flipOrder)
@@ -1236,12 +1285,12 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	/**
 	 * Helper method to detect identifier of given entity object.
 	 * 
-	 * @param pojo
-	 *            the entity object which identifier is to be resolved
+	 * @param pojo the entity object which identifier is to be resolved
 	 * @return the identifier if the given Hibernate entity object
 	 */
 	private Object getIdForPojo(Object pojo)
 	{
+		// TODO: is this really necessary???
 		return classMetadata.getIdentifier(pojo, (SessionImplementor) this.sessionFactory.getCurrentSession());
 	}
 
@@ -1436,8 +1485,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	/**
 	 * Helper method to query new set of entity items to cache from given index.
 	 * 
-	 * @param index
-	 *            the index of first entity object ot be included in query
+	 * @param index the index of first entity object ot be included in query
 	 */
 	@SuppressWarnings("unchecked")
 	private void resetIndexRowBuffer(int index)
@@ -1611,8 +1659,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	/**
 	 * Finds the identifiers for the children of the given item. The returned collection is unmodifiable.
 	 * 
-	 * @param itemId
-	 *            - ID of the Item whose children the caller is interested in
+	 * @param itemId - ID of the Item whose children the caller is interested in
 	 * @return Returns An unmodifiable collection containing the IDs of all other Items that are children in the
 	 *         container hierarchy
 	 */
@@ -1645,8 +1692,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * Gets the identifier of the given item's parent. If there is no parent or we are unable to infer the name of the
 	 * parent property this method will return null.
 	 * 
-	 * @param itemId
-	 *            - The identifier of the item.
+	 * @param itemId - The identifier of the item.
 	 * @return Returns the identifier of the parent, or null if a parent cannot be found.
 	 */
 	public Object getParent(Object itemId)
@@ -1705,10 +1751,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * 
 	 * This operation is optional.
 	 * 
-	 * @param itemId
-	 *            - ID of the item to be set as the child of the Item identified with newParentId
-	 * @param newParentId
-	 *            - ID of the Item that's to be the new parent of the Item identified with itemId
+	 * @param itemId - ID of the item to be set as the child of the Item identified with newParentId
+	 * @param newParentId - ID of the Item that's to be the new parent of the Item identified with itemId
 	 * @return Returns true if the operation succeeded, false if not
 	 */
 	public boolean setParent(Object itemId, Object newParentId)
@@ -1732,8 +1776,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	/**
 	 * Tests if the Item with given ID can have children.
 	 * 
-	 * @param itemId
-	 *            - ID of the Item in the container whose child capability is to be tested
+	 * @param itemId - ID of the Item in the container whose child capability is to be tested
 	 * @return Returns true if the specified Item exists in the Container and it can have children, false if it's not
 	 *         found from the container or it can't have children.
 	 */
@@ -1751,10 +1794,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * 
 	 * This operation is optional. If it is not implemented, the method always returns false.
 	 * 
-	 * @param itemId
-	 *            - ID of the Item in the container whose child capability is to be set.
-	 * @param areChildrenAllowed
-	 *            - boolean value specifying if the Item can have children or not.
+	 * @param itemId - ID of the Item in the container whose child capability is to be set.
+	 * @param areChildrenAllowed - boolean value specifying if the Item can have children or not.
 	 * @return Returns true if the operation succeeded, false if not.
 	 */
 	public boolean setChildrenAllowed(Object itemId, boolean areChildrenAllowed)
@@ -1767,8 +1808,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * and must have at least one unless it is empty. The getParent(Object itemId) method always returns null for root
 	 * Items.
 	 * 
-	 * @param itemId
-	 *            - ID of the Item whose root status is to be tested
+	 * @param itemId - ID of the Item whose root status is to be tested
 	 * @return Returns true if the specified Item is a root, false if not
 	 */
 	public boolean isRoot(Object itemId)
@@ -1794,8 +1834,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * 
 	 * Note that being a leaf does not imply whether or not an Item is allowed to have children.
 	 * 
-	 * @param itemId
-	 *            - ID of the Item to be tested.
+	 * @param itemId - ID of the Item to be tested.
 	 * @return Returns true if the specified Item has children, false if not (is a leaf).
 	 */
 	public boolean hasChildren(Object itemId)
