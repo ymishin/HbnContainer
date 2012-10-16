@@ -24,6 +24,7 @@ public class HbnContainerTests
 	private static Session session = null;
 	private static HbnContainer<Type> typeContainer = null;
 	private static HbnContainer<Workout> workoutContainer = null;
+	private static HbnContainer<SampleNode> nodeContainer = null;
 	private static int recordsToLoad = 10;
 
 	
@@ -39,6 +40,7 @@ public class HbnContainerTests
 		
 		HibernateUtil.insertExampleTypes();
 		HibernateUtil.insertExampleData(recordsToLoad);
+		//HibernateUtil.insertExampleNodes(recordsToLoad);
 	}
 
 	/**
@@ -55,9 +57,6 @@ public class HbnContainerTests
 
 		if (session != null)
 			session.close();
-
-		if (sessionFactory != null)
-			sessionFactory.close();
 	}
 
 	/**
@@ -69,6 +68,7 @@ public class HbnContainerTests
 	{
 		typeContainer = new HbnContainer<Type>(Type.class, sessionFactory);
 		workoutContainer = new HbnContainer<Workout>(Workout.class, sessionFactory);
+		nodeContainer = new HbnContainer<SampleNode>(SampleNode.class, sessionFactory);
 	}
 
 	/**
@@ -80,6 +80,7 @@ public class HbnContainerTests
 	{
 		typeContainer = null;
 		workoutContainer = null;
+		nodeContainer = null;
 	}
 
 	//
@@ -704,97 +705,200 @@ public class HbnContainerTests
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#getChildren(java.lang.Object)}.
+	 * Test method for GetChildren
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#getChildren(java.lang.Object)}.
 	 */
 	@Test
 	public final void testGetChildren()
 	{
-		fail("Not yet implemented"); // TODO
+		HibernateUtil.insertExampleNodes(10);
+		
+		Collection<?> rootEntityIds = nodeContainer.rootItemIds();
+		assertTrue(rootEntityIds.size() == 1);
+		
+		for (Object rootId : rootEntityIds)
+		{
+			Collection<?> entityIds = nodeContainer.getChildren(rootId);
+			assertTrue(entityIds.size() == 9);
+
+			for (Object entityId : entityIds)
+			{
+				Object parentId = nodeContainer.getParent(entityId);
+				assertEquals(parentId, rootId);
+			}
+		}
+		
+		nodeContainer.removeAllItems();
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#getParent(java.lang.Object)}.
+	 * Test method for GetParent
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#getParent(java.lang.Object)}.
 	 */
 	@Test
 	public final void testGetParent()
 	{
-		fail("Not yet implemented"); // TODO
+		final Session session = sessionFactory.getCurrentSession();
+
+		final SampleNode rootNode = new SampleNode();
+		rootNode.setParent(null);
+		session.save(rootNode);
+
+		final SampleNode sampleNode = new SampleNode();
+		sampleNode.setParent(rootNode);
+		session.save(sampleNode);
+		
+		final Object parentId = nodeContainer.getParent(sampleNode.getId());
+		assertEquals(parentId, rootNode.getId());
+		
+		nodeContainer.removeAllItems();
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#rootItemIds()}.
+	 * Test method for RootItemIds
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#rootItemIds()}.
 	 */
 	@Test
 	public final void testRootItemIds()
 	{
-		fail("Not yet implemented"); // TODO
+		final Session session = sessionFactory.getCurrentSession();
+
+		final SampleNode rootNode = new SampleNode();
+		rootNode.setParent(null);
+		session.save(rootNode);
+
+		final SampleNode sampleNode = new SampleNode();
+		sampleNode.setParent(rootNode);
+		session.save(sampleNode);
+		
+		Collection<?> rootEntityIds = nodeContainer.rootItemIds();
+		assertTrue(rootEntityIds.size() == 1);
+		assertTrue(rootEntityIds.contains(rootNode.getId()));
+		
+		nodeContainer.removeAllItems();
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#setParent(java.lang.Object, java.lang.Object)}.
+	 * Test method for SetParent
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#setParent(java.lang.Object, java.lang.Object)}.
 	 */
 	@Test
 	public final void testSetParent()
 	{
-		fail("Not yet implemented"); // TODO
+		final Session session = sessionFactory.getCurrentSession();
+
+		final SampleNode rootNode = new SampleNode();
+		rootNode.setParent(null);
+		session.save(rootNode);
+
+		final SampleNode sampleNode = new SampleNode();
+		sampleNode.setParent(null);
+		session.save(sampleNode);
+		
+		Collection<?> rootEntityIds = nodeContainer.rootItemIds();
+		assertTrue(rootEntityIds.size() == 2);
+		assertTrue(rootEntityIds.contains(rootNode.getId()));
+		assertTrue(rootEntityIds.contains(sampleNode.getId()));
+		
+		nodeContainer.setParent(sampleNode.getId(), rootNode.getId());
+		rootEntityIds = nodeContainer.rootItemIds();
+		assertTrue(rootEntityIds.size() == 1);
+		assertTrue(rootEntityIds.contains(rootNode.getId()));
+		assertTrue(!rootEntityIds.contains(sampleNode.getId()));
+		
+		nodeContainer.removeAllItems();
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#areChildrenAllowed(java.lang.Object)}.
+	 * Test method for AreChildrenAllowed
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#areChildrenAllowed(java.lang.Object)}.
 	 */
 	@Test
 	public final void testAreChildrenAllowed()
 	{
-		fail("Not yet implemented"); // TODO
+		final Session session = sessionFactory.getCurrentSession();
+
+		final SampleNode rootNode = new SampleNode();
+		rootNode.setParent(null);
+		session.save(rootNode);
+
+		boolean childrenAllowed = nodeContainer.areChildrenAllowed(rootNode.getId());
+		assertTrue(childrenAllowed);
+
+		nodeContainer.removeAllItems();
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#setChildrenAllowed(java.lang.Object, boolean)}.
+	 * Test method for SetChildrenAllowed
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#setChildrenAllowed(java.lang.Object, boolean)}.
 	 */
 	@Test
 	public final void testSetChildrenAllowed()
 	{
-		fail("Not yet implemented"); // TODO
+		final Session session = sessionFactory.getCurrentSession();
+
+		final SampleNode rootNode = new SampleNode();
+		rootNode.setParent(null);
+		session.save(rootNode);
+
+		boolean childrenAllowed = nodeContainer.setChildrenAllowed(rootNode.getId(), true);
+		assertTrue(!childrenAllowed);
+
+		childrenAllowed = nodeContainer.setChildrenAllowed(rootNode.getId(), false);
+		assertTrue(!childrenAllowed);
+
+		nodeContainer.removeAllItems();
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#isRoot(java.lang.Object)}.
+	 * Test method for IsRoot
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#isRoot(java.lang.Object)}.
 	 */
 	@Test
 	public final void testIsRoot()
 	{
-		fail("Not yet implemented"); // TODO
+		final Session session = sessionFactory.getCurrentSession();
+
+		final SampleNode rootNode = new SampleNode();
+		rootNode.setParent(null);
+		session.save(rootNode);
+
+		final SampleNode sampleNode = new SampleNode();
+		sampleNode.setParent(rootNode);
+		session.save(sampleNode);
+
+		boolean isRootNode = nodeContainer.isRoot(rootNode.getId());
+		assertTrue(isRootNode);
+
+		isRootNode = nodeContainer.isRoot(sampleNode.getId());
+		assertTrue(!isRootNode);
+
+		nodeContainer.removeAllItems();
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#hasChildren(java.lang.Object)}.
+	 * Test method for HasChildren
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#hasChildren(java.lang.Object)}.
 	 */
 	@Test
 	public final void testHasChildren()
 	{
-		fail("Not yet implemented"); // TODO
-	}
+		final Session session = sessionFactory.getCurrentSession();
 
-	/**
-	 * Test method for
-	 * {@link com.vaadin.data.hbnutil.HbnContainer#addItemSetChangeListener(com.vaadin.data.Container.ItemSetChangeListener)}
-	 * .
-	 */
-	@Test
-	public final void testAddItemSetChangeListener()
-	{
-		fail("Not yet implemented"); // TODO
-	}
+		final SampleNode rootNode = new SampleNode();
+		rootNode.setParent(null);
+		session.save(rootNode);
 
-	/**
-	 * Test method for
-	 * {@link com.vaadin.data.hbnutil.HbnContainer#removeItemSetChangeListener(com.vaadin.data.Container.ItemSetChangeListener)}
-	 * .
-	 */
-	@Test
-	public final void testRemoveItemSetChangeListener()
-	{
-		fail("Not yet implemented"); // TODO
-	}
+		final SampleNode sampleNode = new SampleNode();
+		sampleNode.setParent(rootNode);
+		session.save(sampleNode);
 
+		boolean hasChildren = nodeContainer.hasChildren(rootNode.getId());
+		assertTrue(hasChildren);
+
+		hasChildren = nodeContainer.hasChildren(sampleNode.getId());
+		assertTrue(!hasChildren);
+
+		nodeContainer.removeAllItems();
+	}
 }

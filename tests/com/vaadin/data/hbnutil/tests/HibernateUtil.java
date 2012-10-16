@@ -1,5 +1,7 @@
 package com.vaadin.data.hbnutil.tests;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Calendar;
 import java.util.Random;
 
@@ -35,11 +37,27 @@ public class HibernateUtil
 		}
 		catch (Throwable e)
 		{
-			logger.error(e.toString());
+			logger.error(StackToString(e));
 			throw new ExceptionInInitializerError(e);
 		}
 	}
 
+	private static String StackToString(Throwable exception)
+	{
+		try
+		{
+			final StringWriter stringWriter = new StringWriter();
+			final PrintWriter printWriter = new PrintWriter(stringWriter);
+			exception.printStackTrace(printWriter);
+			return stringWriter.toString();
+		}
+		catch (Exception e)
+		{
+			logger.error(e.toString());
+			return "Stack Trace Unavailable";
+		}
+	}
+	
 	public static SessionFactory getSessionFactory()
 	{
 		return sessionFactory;
@@ -112,6 +130,25 @@ public class HibernateUtil
 			workout.setTrainingType(defaultType);
 			session.save(workout);
 			calendar.add(Calendar.DATE, 1);
+		}
+	}
+
+	public static void insertExampleNodes(int nodesToLoad)
+	{
+		final Session session = HibernateUtil.getSessionFactory().getCurrentSession();
+
+		if (!session.getTransaction().isActive())
+			session.beginTransaction();
+
+		SampleNode rootNode = new SampleNode();
+		rootNode.setParent(null);
+		session.save(rootNode);
+
+		for (int i = 1; i < nodesToLoad; i++)
+		{
+			SampleNode sampleNode = new SampleNode();
+			sampleNode.setParent(rootNode);
+			session.save(sampleNode);
 		}
 	}
 }

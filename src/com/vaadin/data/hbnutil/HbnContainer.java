@@ -1255,7 +1255,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	public Collection<?> getChildren(Object entityId)
 	{
 		final ArrayList<Object> children = new ArrayList<Object>();
-		final String parentPropertyName = getParentPropertyName();
+		parentPropertyName = getParentPropertyName();
 
 		if (parentPropertyName == null)
 			return children;
@@ -1280,7 +1280,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object getParent(Object entityId)
 	{
-		final String parentPropertyName = getParentPropertyName();
+		parentPropertyName = getParentPropertyName();
 
 		if (parentPropertyName == null)
 		{
@@ -1303,7 +1303,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	public Collection<?> rootItemIds()
 	{
 		final ArrayList<Object> rootItems = new ArrayList<Object>();
-		final String parentPropertyName = getParentPropertyName();
+		parentPropertyName = getParentPropertyName();
 
 		if (parentPropertyName == null)
 		{
@@ -1332,7 +1332,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean setParent(Object entityId, Object newParentId)
 	{
-		final String parentPropertyName = getParentPropertyName();
+		parentPropertyName = getParentPropertyName();
 
 		if (parentPropertyName == null)
 		{
@@ -1355,6 +1355,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean areChildrenAllowed(Object entityId)
 	{
+		parentPropertyName = getParentPropertyName();
 		return (parentPropertyName != null && containsId(entityId));
 	}
 
@@ -1381,7 +1382,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean isRoot(Object entityId)
 	{
-		final String parentPropertyName = getParentPropertyName();
+		parentPropertyName = getParentPropertyName();
 
 		if (parentPropertyName == null)
 		{
@@ -1405,7 +1406,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean hasChildren(Object entityId)
 	{
-		final String parentPropertyName = getParentPropertyName();
+		parentPropertyName = getParentPropertyName();
 
 		if (parentPropertyName == null)
 		{
