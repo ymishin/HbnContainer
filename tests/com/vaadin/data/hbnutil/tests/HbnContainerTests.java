@@ -3,6 +3,8 @@ package com.vaadin.data.hbnutil.tests;
 import static org.junit.Assert.*;
 
 import java.util.Collection;
+import java.util.Date;
+import java.util.List;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -22,6 +24,7 @@ public class HbnContainerTests
 	private static Session session = null;
 	private static HbnContainer<Type> typeContainer = null;
 	private static HbnContainer<Workout> workoutContainer = null;
+	private static int recordsToLoad = 10;
 
 	
 	/**
@@ -35,7 +38,7 @@ public class HbnContainerTests
 		session = sessionFactory.openSession();
 		
 		HibernateUtil.insertExampleTypes();
-		HibernateUtil.insertExampleData(10);
+		HibernateUtil.insertExampleData(recordsToLoad);
 	}
 
 	/**
@@ -281,7 +284,6 @@ public class HbnContainerTests
 		entity = (Type) typeContainer.getItem(entityId).getPojo();
 		assertTrue(entity.getTitle() == "zzz");
 		
-		// Not really necessary but we want to cleanup so we may as well check the result.
 		final boolean removed = typeContainer.removeItem(entityId);
 		assertTrue(removed); 
 	}
@@ -305,27 +307,45 @@ public class HbnContainerTests
 		entity = (Type) typeContainer.getItem(entityId).getPojo();
 		assertTrue(entity.getTitle() == "zzz");
 		
-		// Not really necessary but we want to cleanup so we may as well check the result.
 		final boolean removed = typeContainer.removeItem(entityId);
 		assertTrue(removed); 
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#getItemIds()}.
+	 * Test method for GetItemIds
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#getItemIds()}.
 	 */
 	@Test
 	public final void testGetItemIds()
 	{
-		fail("Not yet implemented"); // TODO
+		final Object entityId = typeContainer.addItem();
+		assertNotNull(entityId);
+		
+		Collection<?> entityIds = typeContainer.getItemIds();
+		assertTrue(entityIds.contains(entityId));
+
+		final boolean removed = typeContainer.removeItem(entityId);
+		assertTrue(removed); 
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#getItemIds(int, int)}.
+	 * Test method for GetItemIdsIntInt
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#getItemIds(int, int)}.
 	 */
 	@Test
 	public final void testGetItemIdsIntInt()
 	{
-		fail("Not yet implemented"); // TODO
+		final Object entityId = typeContainer.addItem();
+		assertNotNull(entityId);
+		
+		List<?> entityIds = typeContainer.getItemIds(0, 2);
+		assertTrue(entityIds.size() == 2);
+
+		entityIds = typeContainer.getItemIds(0, typeContainer.size());
+		assertTrue(entityIds.contains(entityId));
+
+		final boolean removed = typeContainer.removeItem(entityId);
+		assertTrue(removed); 
 	}
 
 	/**
@@ -334,198 +354,312 @@ public class HbnContainerTests
 	@Test
 	public final void testGetType()
 	{
-		fail("Not yet implemented"); // TODO
+		Class<?> propertyType = typeContainer.getType("kilometers");
+		assertTrue(propertyType.equals(Float.class));
+
+		propertyType = typeContainer.getType("title");
+		assertTrue(propertyType.equals(String.class));
+
+		propertyType = typeContainer.getType("date");
+		assertTrue(propertyType.equals(Date.class));
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#removeAllItems()}.
+	 * Test method for RemoveAllItems
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#removeAllItems()}.
 	 */
 	@Test
 	public final void testRemoveAllItems()
 	{
-		fail("Not yet implemented"); // TODO
+		workoutContainer.removeAllItems();
+		assertTrue(workoutContainer.size() == 0);
+	
+		typeContainer.removeAllItems();
+		assertTrue(typeContainer.size() == 0);
+
+		HibernateUtil.insertExampleTypes();
+		HibernateUtil.insertExampleData(recordsToLoad);
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#removeContainerProperty(java.lang.Object)}.
+	 * Test method for RemoveContainerProperty
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#removeContainerProperty(java.lang.Object)}.
 	 */
 	@Test
 	public final void testRemoveContainerProperty()
 	{
-		fail("Not yet implemented"); // TODO
+		typeContainer.addContainerProperty("qq", String.class, "");
+		assertTrue(typeContainer.getContainerPropertyIds().contains("qq"));
+
+		typeContainer.removeContainerProperty("qq");
+		assertTrue(!typeContainer.getContainerPropertyIds().contains("qq"));
+
+		typeContainer.addContainerProperty("ww", Integer.class, 1);
+		assertTrue(typeContainer.getContainerPropertyIds().contains("ww"));
+
+		typeContainer.removeContainerProperty("ww");
+		assertTrue(!typeContainer.getContainerPropertyIds().contains("ww"));
+
+		typeContainer.addContainerProperty("ee", Long.class, 1);
+		assertTrue(typeContainer.getContainerPropertyIds().contains("ee"));
+
+		typeContainer.removeContainerProperty("ee");
+		assertTrue(!typeContainer.getContainerPropertyIds().contains("ee"));
+		
+		typeContainer.addContainerProperty("rr", Float.class, 1.0);
+		assertTrue(typeContainer.getContainerPropertyIds().contains("rr"));
+
+		typeContainer.removeContainerProperty("rr");
+		assertTrue(!typeContainer.getContainerPropertyIds().contains("rr"));
+		
+		typeContainer.addContainerProperty("tt", Double.class, 1.0);
+		assertTrue(typeContainer.getContainerPropertyIds().contains("tt"));
+
+		typeContainer.removeContainerProperty("tt");
+		assertTrue(!typeContainer.getContainerPropertyIds().contains("tt"));
+		
+		typeContainer.addContainerProperty("yy", Boolean.class, true);
+		assertTrue(typeContainer.getContainerPropertyIds().contains("yy"));
+
+		typeContainer.removeContainerProperty("yy");
+		assertTrue(!typeContainer.getContainerPropertyIds().contains("yy"));
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#removeItem(java.lang.Object)}.
+	 * Test method for RemoveItem
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#removeItem(java.lang.Object)}.
 	 */
 	@Test
 	public final void testRemoveItem()
 	{
-		fail("Not yet implemented"); // TODO
+		final Object entityId = typeContainer.addItem();
+		assertNotNull(entityId);
+		
+		final boolean removed = typeContainer.removeItem(entityId);
+		assertTrue(removed); 
+
+		Collection<?> entityIds = typeContainer.getItemIds();
+		assertTrue(!entityIds.contains(entityId));
 	}
 
 	/**
-	 * Test method for
-	 * {@link com.vaadin.data.hbnutil.HbnContainer#addListener(com.vaadin.data.Container.ItemSetChangeListener)}.
-	 */
-	@Test
-	public final void testAddListener()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for
-	 * {@link com.vaadin.data.hbnutil.HbnContainer#removeListener(com.vaadin.data.Container.ItemSetChangeListener)}.
-	 */
-	@Test
-	public final void testRemoveListener()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#size()}.
+	 * Test method for Size
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#size()}.
 	 */
 	@Test
 	public final void testSize()
 	{
-		fail("Not yet implemented"); // TODO
+		workoutContainer.removeAllItems();
+		assertTrue(workoutContainer.size() == 0);
+	
+		typeContainer.removeAllItems();
+		assertTrue(typeContainer.size() == 0);
+
+		HibernateUtil.insertExampleTypes();
+		HibernateUtil.insertExampleData(recordsToLoad);
+		assertTrue(workoutContainer.size() == recordsToLoad);
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#addItemAfter(java.lang.Object)}.
+	 * Test method for AddItemAfterObject
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#addItemAfter(java.lang.Object)}.
 	 */
-	@Test
+	@Test(expected = UnsupportedOperationException.class)
 	public final void testAddItemAfterObject()
 	{
-		fail("Not yet implemented"); // TODO
+		final Object entityId = typeContainer.firstItemId();
+		typeContainer.addItemAfter(entityId); // should be unsupported
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#addItemAfter(java.lang.Object, java.lang.Object)}.
+	 * Test method for AddItemAfterObjectObject
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#addItemAfter(java.lang.Object, java.lang.Object)}.
 	 */
-	@Test
+	@Test(expected = UnsupportedOperationException.class)
 	public final void testAddItemAfterObjectObject()
 	{
-		fail("Not yet implemented"); // TODO
+		final Object entityId = typeContainer.firstItemId();
+		typeContainer.addItemAfter(entityId, 12345); // should be unsupported
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#getOrder(boolean)}.
-	 */
-	@Test
-	public final void testGetOrder()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#getDefaultOrder(boolean)}.
-	 */
-	@Test
-	public final void testGetDefaultOrder()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#getBaseCriteria()}.
-	 */
-	@Test
-	public final void testGetBaseCriteria()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#getNaturalOrder(boolean)}.
-	 */
-	@Test
-	public final void testGetNaturalOrder()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#firstItemId()}.
+	 * Test method for FirstItemId
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#firstItemId()}.
 	 */
 	@Test
 	public final void testFirstItemId()
 	{
-		fail("Not yet implemented"); // TODO
+		workoutContainer.removeAllItems();
+		typeContainer.removeAllItems();
+
+		final Object entityId = typeContainer.addItem();
+		assertNotNull(entityId);
+		
+		final Object entityId2 = typeContainer.addItem();
+		assertNotNull(entityId2);
+		
+		assertTrue(typeContainer.firstItemId().equals(entityId));
+		
+		final boolean removed = typeContainer.removeItem(entityId);
+		assertTrue(removed); 
+
+		assertTrue(typeContainer.firstItemId().equals(entityId2));
+
+		workoutContainer.removeAllItems();
+		assertTrue(workoutContainer.size() == 0);
+
+		typeContainer.removeAllItems();
+		assertTrue(workoutContainer.size() == 0);
+
+		HibernateUtil.insertExampleTypes();
+		HibernateUtil.insertExampleData(recordsToLoad);
+		assertTrue(workoutContainer.size() == recordsToLoad);
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#firstItemId(boolean)}.
-	 */
-	@Test
-	public final void testFirstItemIdBoolean()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#isFirstId(java.lang.Object)}.
+	 * Test method for IsFirstId
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#isFirstId(java.lang.Object)}.
 	 */
 	@Test
 	public final void testIsFirstId()
 	{
-		fail("Not yet implemented"); // TODO
+		workoutContainer.removeAllItems();
+		typeContainer.removeAllItems();
+
+		final Object entityId = typeContainer.addItem();
+		assertNotNull(entityId);
+		
+		final Object entityId2 = typeContainer.addItem();
+		assertNotNull(entityId2);
+		
+		assertTrue(typeContainer.isFirstId(entityId));
+		
+		final boolean removed = typeContainer.removeItem(entityId);
+		assertTrue(removed); 
+
+		assertTrue(typeContainer.isFirstId(entityId2));
+
+		workoutContainer.removeAllItems();
+		assertTrue(workoutContainer.size() == 0);
+
+		typeContainer.removeAllItems();
+		assertTrue(workoutContainer.size() == 0);
+
+		HibernateUtil.insertExampleTypes();
+		HibernateUtil.insertExampleData(recordsToLoad);
+		assertTrue(workoutContainer.size() == recordsToLoad);
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#isLastId(java.lang.Object)}.
+	 * Test method for IsLastId
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#isLastId(java.lang.Object)}.
 	 */
 	@Test
 	public final void testIsLastId()
 	{
-		fail("Not yet implemented"); // TODO
+		workoutContainer.removeAllItems();
+		typeContainer.removeAllItems();
+
+		final Object entityId = typeContainer.addItem();
+		assertNotNull(entityId);
+		
+		final Object entityId2 = typeContainer.addItem();
+		assertNotNull(entityId2);
+		
+		assertTrue(typeContainer.isLastId(entityId2));
+		
+		final boolean removed = typeContainer.removeItem(entityId2);
+		assertTrue(removed); 
+
+		assertTrue(typeContainer.isLastId(entityId));
+
+		workoutContainer.removeAllItems();
+		assertTrue(workoutContainer.size() == 0);
+
+		typeContainer.removeAllItems();
+		assertTrue(workoutContainer.size() == 0);
+
+		HibernateUtil.insertExampleTypes();
+		HibernateUtil.insertExampleData(recordsToLoad);
+		assertTrue(workoutContainer.size() == recordsToLoad);
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#lastItemId()}.
+	 * Test method for LastItemId
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#lastItemId()}.
 	 */
 	@Test
 	public final void testLastItemId()
 	{
-		fail("Not yet implemented"); // TODO
+		final Object entityId = typeContainer.addItem();
+		assertNotNull(entityId);
+		
+		final Object lastId = typeContainer.lastItemId();
+		assertTrue(entityId.equals(lastId));
+		assertTrue(typeContainer.isLastId(lastId));
+		assertTrue(typeContainer.isLastId(entityId));
+
+		final boolean removed = typeContainer.removeItem(entityId);
+		assertTrue(removed); 
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#nextItemId(java.lang.Object)}.
+	 * Test method for NextItemId
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#nextItemId(java.lang.Object)}.
 	 */
 	@Test
 	public final void testNextItemId()
 	{
-		fail("Not yet implemented"); // TODO
+		final Object entityId = typeContainer.addItem();
+		assertNotNull(entityId);
+		
+		final Object entityId2 = typeContainer.addItem();
+		assertNotNull(entityId2);
+		
+		assertTrue(typeContainer.nextItemId(entityId).equals(entityId2));
+		
+		boolean removed = typeContainer.removeItem(entityId);
+		assertTrue(removed); 
+
+		removed = typeContainer.removeItem(entityId2);
+		assertTrue(removed); 
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#prevItemId(java.lang.Object)}.
+	 * Test method for PrevItemId
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#prevItemId(java.lang.Object)}.
 	 */
 	@Test
 	public final void testPrevItemId()
 	{
-		fail("Not yet implemented"); // TODO
+		final Object firstId = typeContainer.firstItemId();
+		assertNotNull(firstId);
+		
+		final Object secondId = typeContainer.nextItemId(firstId);
+		assertNotNull(secondId);
+	
+		assertTrue(typeContainer.prevItemId(secondId).equals(firstId));
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#addItemAt(int)}.
+	 * Test method for AddItemAtInt
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#addItemAt(int)}.
 	 */
-	@Test
+	@Test(expected = UnsupportedOperationException.class)
 	public final void testAddItemAtInt()
 	{
-		fail("Not yet implemented"); // TODO
+		typeContainer.addItemAt(0);
+		// expecting an UnsupportedOperationException
 	}
 
 	/**
 	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#addItemAt(int, java.lang.Object)}.
 	 */
-	@Test
+	@Test(expected = UnsupportedOperationException.class)
 	public final void testAddItemAtIntObject()
 	{
-		fail("Not yet implemented"); // TODO
+		typeContainer.addItemAt(0, 1234);
+		// expecting an UnsupportedOperationException
 	}
 
 	/**
@@ -534,102 +668,39 @@ public class HbnContainerTests
 	@Test
 	public final void testGetIdByIndex()
 	{
-		fail("Not yet implemented"); // TODO
+		final Object entityId = typeContainer.getIdByIndex(0);
+		assertNotNull(entityId);
+		
+		final Object firstId = typeContainer.firstItemId();
+		assertNotNull(firstId);
+	
+		assertTrue(entityId.equals(firstId));
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#indexOfId(java.lang.Object)}.
+	 * Test method for IndexOfId
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#indexOfId(java.lang.Object)}.
 	 */
 	@Test
 	public final void testIndexOfId()
 	{
-		fail("Not yet implemented"); // TODO
+		final Object entityId = typeContainer.firstItemId();
+		assertNotNull(entityId);
+		
+		assertTrue(typeContainer.indexOfId(entityId) == 0);
 	}
 
 	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#getSortableContainerPropertyIds()}.
+	 * Test method for GetSortableContainerPropertyIds
+	 * {@link com.vaadin.data.hbnutil.HbnContainer#getSortableContainerPropertyIds()}.
 	 */
 	@Test
 	public final void testGetSortableContainerPropertyIds()
 	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#sort(java.lang.Object[], boolean[])}.
-	 */
-	@Test
-	public final void testSort()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#clearInternalCache()}.
-	 */
-	@Test
-	public final void testClearInternalCache()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for
-	 * {@link com.vaadin.data.hbnutil.HbnContainer#addContainerFilter(java.lang.Object, java.lang.String, boolean, boolean)}
-	 * .
-	 */
-	@Test
-	public final void testAddContainerFilterObjectStringBooleanBoolean()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for
-	 * {@link com.vaadin.data.hbnutil.HbnContainer#addContainerFilter(com.vaadin.data.hbnutil.ContainerFilter)}.
-	 */
-	@Test
-	public final void testAddContainerFilterContainerFilter()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#removeAllContainerFilters()}.
-	 */
-	@Test
-	public final void testRemoveAllContainerFilters()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#removeContainerFilters(java.lang.Object)}.
-	 */
-	@Test
-	public final void testRemoveContainerFilters()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for {@link com.vaadin.data.hbnutil.HbnContainer#addContainerFilter(com.vaadin.data.Container.Filter)}
-	 * .
-	 */
-	@Test
-	public final void testAddContainerFilterFilter()
-	{
-		fail("Not yet implemented"); // TODO
-	}
-
-	/**
-	 * Test method for
-	 * {@link com.vaadin.data.hbnutil.HbnContainer#removeContainerFilter(com.vaadin.data.Container.Filter)}.
-	 */
-	@Test
-	public final void testRemoveContainerFilter()
-	{
-		fail("Not yet implemented"); // TODO
+		Collection<?> propertyIds = typeContainer.getSortableContainerPropertyIds();
+		assertTrue(propertyIds.contains("title"));
+		assertTrue(propertyIds.contains("date"));
+		assertTrue(propertyIds.contains("kilometers"));
 	}
 
 	/**
