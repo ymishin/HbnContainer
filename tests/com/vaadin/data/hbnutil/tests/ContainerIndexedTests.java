@@ -1,11 +1,14 @@
 package com.vaadin.data.hbnutil.tests;
 
 import static org.junit.Assert.*;
+
+import java.util.List;
+
 import org.hibernate.*;
 import org.junit.*;
 import com.vaadin.data.hbnutil.*;
 
-public class HbnContainerTests
+public class ContainerIndexedTests
 {
 	private static SessionFactory sessionFactory = null;
 	private static Session session = null;
@@ -46,59 +49,51 @@ public class HbnContainerTests
 	//
 	// ************************************************************************************************************
 	//
-	
-	@Test
-	public final void testSaveEntity()
-	{
-		SampleNode entity = new SampleNode();
-		entity.setTitle("zzz");
-		
-		final Object entityId = container.saveEntity(entity);
-		assertNotNull(entityId);
-		entity = null;
 
-		entity = container.getItem(entityId).getPojo();
-		assertTrue(entity.getTitle() == "zzz");
+	@Test
+	public final void testIndexOfId()
+	{
+		final Object entityId = container.firstItemId();
+		assertNotNull(entityId);
+		assertTrue(container.indexOfId(entityId) == 0);
+	}
+
+	@Test
+	public final void testGetIdByIndex()
+	{
+		final Object entityId = container.getIdByIndex(0);
+		assertNotNull(entityId);
 		
+		final Object firstId = container.firstItemId();
+		assertNotNull(firstId);
+		assertTrue(entityId.equals(firstId));
+	}
+
+	@Test
+	public final void testGetItemIds()
+	{
+		final Object entityId = container.addItem();
+		assertNotNull(entityId);
+		
+		List<?> entityIds = container.getItemIds(0, 2);
+		assertTrue(entityIds.size() == 2);
+
+		entityIds = container.getItemIds(0, container.size());
+		assertTrue(entityIds.contains(entityId));
+
 		final boolean removed = container.removeItem(entityId);
 		assertTrue(removed); 
 	}
 
-	@Test
-	public final void testUpdateEntity()
+	@Test(expected = UnsupportedOperationException.class)
+	public final void testAddItemAtInt()
 	{
-		final Object entityId = container.addItem();
-		assertNotNull(entityId);
-
-		SampleNode entity = (SampleNode) container.getItem(entityId).getPojo();
-		entity.setTitle("zzz");
-
-		container.updateEntity(entity);
-		entity = null;
-
-		entity = container.getItem(entityId).getPojo();
-		assertTrue(entity.getTitle() == "zzz");
-		
-		final boolean removed = container.removeItem(entityId);
-		assertTrue(removed); 
+		container.addItemAt(0);
 	}
 
-	@Test
-	public final void testLoadItem()
+	@Test(expected = UnsupportedOperationException.class)
+	public final void testAddItemAtIntObject()
 	{
-		final Object entityId = container.addItem();
-		assertNotNull(entityId);
-
-		SampleNode entity = container.getItem(entityId).getPojo();
-		entity.setTitle("zzz");
-
-		container.updateEntity(entity);
-		entity = null;
-
-		entity = container.getItem(entityId).getPojo();
-		assertTrue(entity.getTitle() == "zzz");
-		
-		final boolean removed = container.removeItem(entityId);
-		assertTrue(removed); 
+		container.addItemAt(0, 1234);
 	}
 }

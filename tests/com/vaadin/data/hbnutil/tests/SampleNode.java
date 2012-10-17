@@ -25,6 +25,12 @@ public class SampleNode implements Serializable
 	{
 	}
 
+	public SampleNode(String title, SampleNode parent)
+	{
+		this.title = title;
+		this.parent = parent;
+	}
+
 	@Id
 	@Column
 	@GeneratedValue(strategy = GenerationType.AUTO)

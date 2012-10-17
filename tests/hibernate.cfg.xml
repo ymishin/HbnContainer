@@ -17,8 +17,6 @@
 		<property name="hibernate.use_sql_comments">true</property>
 						
 		<!-- Entity Mappings -->
-		<mapping class="com.vaadin.data.hbnutil.tests.Type" />
-		<mapping class="com.vaadin.data.hbnutil.tests.Workout" />
 		<mapping class="com.vaadin.data.hbnutil.tests.SampleNode" />
 	</session-factory>
 </hibernate-configuration>

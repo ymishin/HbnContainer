@@ -839,6 +839,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Collection<?> getItemIds()
 	{
+		// TODO: BUG: does not preserve sort order!
 		final Criteria criteria = getCriteria();
 		criteria.setProjection(Projections.id());
 		return criteria.list();
@@ -1310,8 +1311,10 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			logger.warn("failed to find a parent property name; hierarchy may be incomplete.");
 			return rootItems;
 		}
+		
+		final Collection<?> allItemIds = getItemIds();
 
-		for (Object id : getItemIds())
+		for (Object id : allItemIds)
 		{
 			EntityItem<T> entity = getItem(id);
 			Property<?> property = entity.getItemProperty(parentPropertyName);
@@ -1476,7 +1479,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	//
 
 	/**
-	 * This is an internal HbnContaner utility method. Determines if a property is contained within an embedded key.
+	 * This is an internal HbnContainer utility method. Determines if a property is contained within an embedded key.
 	 */
 	private boolean propertyInEmbeddedKey(Object propertyId)
 	{
@@ -1496,7 +1499,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method. Fetches entities by identifier. Override this if you need to
+	 * This is an internal HbnContainer utility method. Fetches entities by identifier. Override this if you need to
 	 * customize a query for EntityItems.
 	 */
 	protected EntityItem<T> loadEntity(Serializable entityId)
@@ -1524,7 +1527,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method. This method triggers events associated with the
+	 * This is an internal HbnContainer utility method. This method triggers events associated with the
 	 * ItemSetChangeListener.
 	 */
 	private void fireItemSetChange()
@@ -1552,7 +1555,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method. Gets a base listing using current ordering criteria.
+	 * This is an internal HbnContainer utility method. Gets a base listing using current ordering criteria.
 	 */
 	private Criteria getCriteria()
 	{
@@ -1568,7 +1571,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method. Return the ordering criteria in the order in which they should be
+	 * This is an internal HbnContainer utility method. Return the ordering criteria in the order in which they should be
 	 * applied. The composed order must be stable and must include {@link #getNaturalOrder(boolean)} at the end.
 	 */
 	protected final List<Order> getOrder(boolean flipOrder)
@@ -1580,7 +1583,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method. Returns the ordering to use for the container contents. The
+	 * This is an internal HbnContainer utility method. Returns the ordering to use for the container contents. The
 	 * default implementation provides the {@link Container.Sortable} functionality. Can be overridden to customize item
 	 * sort order.
 	 */
@@ -1613,7 +1616,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method. Creates the base criteria for entity class and add possible
+	 * This is an internal HbnContainer utility method. Creates the base criteria for entity class and add possible
 	 * restrictions to query. This method is protected so developers can add their own custom criteria.
 	 */
 	protected Criteria getBaseCriteria()
@@ -1638,7 +1641,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method. Natural order is the order in which the database is sorted if
+	 * This is an internal HbnContainer utility method. Natural order is the order in which the database is sorted if
 	 * container has no other ordering set. Natural order is always added as least significant order to queries. This is
 	 * needed to keep items stable order across queries. The default implementation sorts entities by identifier column.
 	 */
@@ -1649,7 +1652,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method to implement {@link #firstItemId()} and {@link #lastItemId()}.
+	 * This is an internal HbnContainer utility method to implement {@link #firstItemId()} and {@link #lastItemId()}.
 	 */
 	protected Object firstItemId(boolean bypassCache)
 	{
@@ -1670,7 +1673,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method to detect identifier of given entity object.
+	 * This is an internal HbnContainer utility method to detect identifier of given entity object.
 	 */
 	private Object getIdForPojo(Object pojo)
 	{
@@ -1679,7 +1682,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method. RowBuffer stores a list of entity items to avoid excessive number
+	 * This is an internal HbnContainer utility method. RowBuffer stores a list of entity items to avoid excessive number
 	 * of DB queries.
 	 */
 	private List<T> getRowBuffer()
@@ -1688,7 +1691,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method. RowBuffer stores some pojos to avoid excessive number of DB
+	 * This is an internal HbnContainer utility method. RowBuffer stores some pojos to avoid excessive number of DB
 	 * queries. Also updates the idToIndex map.
 	 */
 	private void setRowBuffer(List<T> list, int firstIndex)
@@ -1715,7 +1718,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method that gets the property name of the identifier.
+	 * This is an internal HbnContainer utility method that gets the property name of the identifier.
 	 */
 	private String getIdPropertyName()
 	{
@@ -1723,7 +1726,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method to query new set of entity items to cache from given index.
+	 * This is an internal HbnContainer utility method to query new set of entity items to cache from given index.
 	 */
 	@SuppressWarnings("unchecked")
 	private void resetIndexRowBuffer(int index)
@@ -1733,7 +1736,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method that gets the index of the given identifier.
+	 * This is an internal HbnContainer utility method that gets the index of the given identifier.
 	 */
 	private int slowIndexOfId(Object entityId)
 	{
@@ -1743,7 +1746,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method. Adds container filter for hibernate mapped property. For property
+	 * This is an internal HbnContainer utility method. Adds container filter for hibernate mapped property. For property
 	 * not mapped by Hibernate.
 	 */
 	public void addContainerFilter(Object propertyId, String filterString, boolean ignoreCase, boolean onlyMatchPrefix)
@@ -1752,7 +1755,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method that adds a container filter.
+	 * This is an internal HbnContainer utility method that adds a container filter.
 	 */
 	public void addContainerFilter(ContainerFilter containerFilter)
 	{
@@ -1772,7 +1775,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method that removes container filters for the given property identifier.
+	 * This is an internal HbnContainer utility method that removes container filters for the given property identifier.
 	 */
 	public void removeContainerFilters(Object propertyId)
 	{
@@ -1792,7 +1795,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method that removes the given container filter.
+	 * This is an internal HbnContainer utility method that removes the given container filter.
 	 */
 	@Override
 	public void removeContainerFilter(Filter filter)
@@ -1809,7 +1812,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method that infers the name of the parent field belonging to the current
+	 * This is an internal HbnContainer utility method that infers the name of the parent field belonging to the current
 	 * property based on type.
 	 */
 	private String getParentPropertyName()
@@ -1841,7 +1844,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	//
 
 	/**
-	 * This is an internal HbnContaner utility method. Cleans the entityCache of collected item references. This method
+	 * This is an internal HbnContainer utility method. Cleans the entityCache of collected item references. This method
 	 * runs occasionally by {@link #loadEntity(Serializable)}, but may be run manually too.
 	 * 
 	 * <p>
@@ -1871,7 +1874,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContaner utility method to clear all cache fields.
+	 * This is an internal HbnContainer utility method to clear all cache fields.
 	 */
 	protected void clearInternalCache()
 	{
