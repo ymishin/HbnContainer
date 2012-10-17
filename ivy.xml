@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
-<!DOCTYPE ivy-module [<!ENTITY vaadin.version "7.0.0.beta4">]>
+<!DOCTYPE ivy-module [<!ENTITY vaadin.version "7.0.0.beta5">]>
 <ivy-module version="2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd">
-	<info organisation="com.vaadin.data.hbnutil" module="HbnContainer" revision="2.0.0" status="release" />
+	<info organisation="com.vaadin.data.hbnutil" module="HbnContainer" revision="2.0.1" status="release" />
 	<configurations>
 		<conf name="default" />
 		<conf name="widgetset-compile" />
