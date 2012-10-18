@@ -66,14 +66,28 @@ public class ContainerOrderedTests
 	{
 		container.addItem();
 		container.addItem();
+		container.addItem();
+		
+		@SuppressWarnings("unused")
+		Object[] itemIds = container.getItemIds().toArray();
 
-		final Object firstId = container.firstItemId();
+		Object firstId = container.firstItemId();
 		assertNotNull(firstId);
 		
-		final Object secondId = container.nextItemId(firstId);
+		Object secondId = container.nextItemId(firstId);
 		assertNotNull(secondId);
-	
-		assertTrue(container.prevItemId(secondId).equals(firstId));
+		
+		Object thirdId = container.nextItemId(secondId);
+		assertNotNull(thirdId);
+		
+		Object prevId = container.prevItemId(firstId);
+		assertTrue(prevId == null);
+		
+		prevId = container.prevItemId(secondId);
+		assertTrue(prevId.equals(firstId));
+		
+		prevId = container.prevItemId(thirdId);
+		assertTrue(prevId.equals(secondId));
 	}
 	
 	@Test

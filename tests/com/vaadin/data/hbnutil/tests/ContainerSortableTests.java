@@ -83,6 +83,10 @@ public class ContainerSortableTests
 		{
 			SampleNode entity = container.getItem(entityId).getPojo();
 			currId = entity.getId();
+			
+			if (lastId == -1) // only on first iteration
+				lastId = currId + 1;
+			
 			assertTrue(currId < lastId);
 			lastId = currId;
 		}

@@ -79,6 +79,11 @@ public class HbnContainerTests
 		entity = container.getItem(entityId).getPojo();
 		assertTrue(entity.getTitle() == "zzz");
 		
+		container.sort(new Object[] { "id" }, new boolean[] { true });
+		
+		entity = container.getItem(entityId).getPojo();
+		assertTrue(entity.getTitle() == "zzz");
+		
 		final boolean removed = container.removeItem(entityId);
 		assertTrue(removed); 
 	}
