@@ -1,11 +1,16 @@
 <?xml version="1.0"?>
 <!DOCTYPE ivy-module [<!ENTITY vaadin.version "7.0.0.beta5">]>
-<ivy-module version="2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd">
-	<info organisation="com.vaadin.data.hbnutil" module="HbnContainer" revision="2.0.1" status="release" />
+<ivy-module version="2.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+    xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd">
+
+    <info organisation="com.vaadin.data.hbnutil" module="HbnContainer" revision="2.0.1" status="release" />
+    
 	<configurations>
 		<conf name="default" />
 		<conf name="widgetset-compile" />
 	</configurations>
+	
 	<dependencies>
 		<!-- Vaadin -->
 		<dependency org="com.vaadin" name="vaadin-server" rev="&vaadin.version;" conf="default->default" />
@@ -16,7 +21,6 @@
 
 		<!-- Hibernate -->
 		<dependency org="org.hibernate" name="hibernate-core" rev="4.1.7.Final"/>
-		<!-- <dependency org="org.hibernate" name="hibernate-entitymanager" rev="4.1.7.Final"/> -->
 		<dependency org="org.hibernate" name="hibernate-c3p0" rev="4.1.7.Final"/>
 		
 		<!-- SLF4J / Log4j -->
@@ -26,5 +30,6 @@
 		<!-- HSQLDB -->
 		<dependency org="org.hsqldb" name="hsqldb" rev="2.2.8"/>
 	</dependencies>
+	
 </ivy-module>
     
