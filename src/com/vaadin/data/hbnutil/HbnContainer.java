@@ -1057,9 +1057,6 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object nextItemId(Object entityId)
 	{
-		if (isLastId(entityId))
-			return null;
-
 		final EntityItem<T> entity = new EntityItem<T>((Serializable) entityId);
 		final List<T> rowBuffer = getRowBuffer();
 
@@ -1082,10 +1079,14 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		// row. Then first result is next item.
 
 		int currentIndex = indexOfId(entityId);
+		int size = size();
 
 		int firstIndex = (normalOrder)
 				? currentIndex + 1
-				: size() - currentIndex - 1;
+				: size - currentIndex;
+		
+		if (firstIndex < 0 || firstIndex >= size)
+			return null;
 
 		final Criteria criteria = getCriteria()
 				.setFirstResult(firstIndex)
