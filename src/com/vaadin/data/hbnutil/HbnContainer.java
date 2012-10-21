@@ -53,7 +53,7 @@ import com.google.common.cache.LoadingCache;
 import com.vaadin.data.Container;
 import com.vaadin.data.Item;
 import com.vaadin.data.Property;
-import com.vaadin.data.hbnutil.HbnContainer.EntityItem.EntityItemProperty;
+import com.vaadin.data.hbnutil.HbnContainer.EntityItem.EntityProperty;
 import com.vaadin.data.util.MethodProperty;
 import com.vaadin.data.util.converter.Converter.ConversionException;
 import com.vaadin.data.util.filter.SimpleStringFilter;
@@ -140,7 +140,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			Property<?> p = properties.get(id);
 			if (p == null)
 			{
-				p = new EntityItemProperty(id.toString());
+				p = new EntityProperty(id.toString());
 				properties.put(id, p);
 			}
 			return p;
@@ -175,7 +175,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		 * class.
 		 */
 		@SuppressWarnings("rawtypes")
-		public class EntityItemProperty implements Property, Property.ValueChangeNotifier
+		public class EntityProperty implements Property, Property.ValueChangeNotifier
 		{
 			private static final long serialVersionUID = -4086774943938055297L;
 			private List<ValueChangeListener> valueChangeListeners;
@@ -184,7 +184,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			/**
 			 * Default Constructor.
 			 */
-			public EntityItemProperty(String propertyName)
+			public EntityProperty(String propertyName)
 			{
 				this.propertyName = propertyName;
 			}
@@ -556,7 +556,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 
 				public Property<?> getProperty()
 				{
-					return EntityItemProperty.this;
+					return EntityProperty.this;
 				}
 			}
 
@@ -679,10 +679,10 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			for (Object propertyId : cachedEntity.getItemPropertyIds())
 			{
 				Property<?> cachedProperty = cachedEntity.getItemProperty(propertyId);
-				if (cachedProperty instanceof EntityItem.EntityItemProperty)
+				if (cachedProperty instanceof EntityItem.EntityProperty)
 				{
 					@SuppressWarnings("rawtypes")
-					EntityItemProperty entityProperty = (EntityItemProperty) cachedProperty;
+					EntityProperty entityProperty = (EntityProperty) cachedProperty;
 					entityProperty.fireValueChange();
 				}
 			}
