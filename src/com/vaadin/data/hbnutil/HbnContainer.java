@@ -16,7 +16,6 @@ package com.vaadin.data.hbnutil;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.io.StringWriter;
-import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
@@ -30,8 +29,8 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +47,9 @@ import org.hibernate.metadata.ClassMetadata;
 import org.hibernate.type.ComponentType;
 import org.hibernate.type.Type;
 
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.vaadin.data.Container;
 import com.vaadin.data.Item;
 import com.vaadin.data.Property;
@@ -67,11 +69,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	private ClassMetadata classMetadata;
 	private Class<T> entityType;
 	private String parentPropertyName = null;
-
-	private static final int REFERENCE_CLEANUP_INTERVAL = 2000;
 	private static final int ROW_BUF_SIZE = 100;
 	private static final int ID_TO_INDEX_MAX_SIZE = 300;
-
 	private boolean normalOrder = true;
 	private List<T> ascRowBuffer;
 	private List<T> descRowBuffer;
@@ -85,9 +84,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	private Integer size;
 	private LinkedList<ItemSetChangeListener> itemSetChangeListeners;
 	private HashSet<ContainerFilter> filters;
-	private final HashMap<Object, WeakReference<EntityItem<T>>> entityCache = new HashMap<Object, WeakReference<EntityItem<T>>>();
 	private final Map<String, Class<?>> addedProperties = new HashMap<String, Class<?>>();
-	private int loadCount;
+	private final LoadingCache<Object, EntityItem<T>> cache;
 
 	/**
 	 * Item wrappping a Hibernate mapped entity object. EntityItems are generally instantiated automatically by
@@ -592,13 +590,35 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		this.entityType = entityType;
 		this.sessionFactory = sessionFactory;
 		this.classMetadata = sessionFactory.getClassMetadata(entityType);
+
+		this.cache = CacheBuilder.newBuilder()
+				.expireAfterAccess(2, TimeUnit.MINUTES)
+				.maximumSize(10000)
+				.recordStats()
+				.weakValues()
+				.build(new CacheLoader<Object, EntityItem<T>>()
+				{
+					@Override
+					public EntityItem<T> load(Object entityId) throws Exception
+					{
+						try
+						{
+							return loadEntity((Serializable) entityId);
+						}
+						catch (Exception e)
+						{
+							logger.error(unwindStack(e));
+							throw e;
+						}
+					}
+				});
 	}
 
 	/**
-	 * This is an internal utility method that takes an exception, extracts the stack trace and creates a string from
-	 * the stack trace.
+	 * This method unwinds the call stack for the given exception and creates a human readable string that can be used
+	 * for logging or printing.
 	 */
-	private String StackToString(Throwable exception)
+	protected String unwindStack(Throwable exception)
 	{
 		try
 		{
@@ -610,16 +630,74 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		catch (Exception e)
 		{
 			logger.error(e.toString());
-			return "Stack Trace Unavailable";
+			return "Stack Trace Unavailable: " + e.getMessage();
 		}
 	}
 
 	/**
-	 * Adds a new Property to all Items in the Container. The Property ID, data type and default value of the new
-	 * Property are given as parameters. This functionality is optional.
-	 * 
-	 * HbnContainer automatically adds all fields that are mapped by Hibernate to the database. With this method we can
-	 * add a bean property to the container that is contained in the pojo but not hibernate-mapped.
+	 * This method is used to load an entity from the database. This method is called automatically by the cache loader
+	 * when it needs to load an entity into the cache but it can be called manually if necessary.
+	 */
+	protected EntityItem<T> loadEntity(Serializable entityId)
+	{
+		EntityItem<T> entity = null;
+
+		if (entityId != null)
+			entity = new EntityItem<T>(entityId);
+
+		return entity;
+	}
+
+	/**
+	 * This method is used to save an entity to the database and in the process it will fire an item set change event.
+	 */
+	public Serializable saveEntity(T entity)
+	{
+		final Session session = sessionFactory.getCurrentSession();
+		final Object entityId = session.save(entity);
+
+		clearInternalCache();
+		fireItemSetChange();
+
+		return (Serializable) entityId;
+	}
+
+	/**
+	 * This method is used to update an entity in the database, update the cache and fire value change events when
+	 * necessary.
+	 */
+	public Serializable updateEntity(T entity)
+	{
+		final Session session = sessionFactory.getCurrentSession();
+		session.update(entity);
+
+		final Object entityId = getIdForPojo(entity);
+		final EntityItem<T> cachedEntity = cache.getIfPresent(entityId);
+
+		cache.refresh(entityId);
+
+		if (cachedEntity != null)
+		{
+			for (Object propertyId : cachedEntity.getItemPropertyIds())
+			{
+				Property<?> cachedProperty = cachedEntity.getItemProperty(propertyId);
+				if (cachedProperty instanceof EntityItem.EntityItemProperty)
+				{
+					@SuppressWarnings("rawtypes")
+					EntityItemProperty entityProperty = (EntityItemProperty) cachedProperty;
+					entityProperty.fireValueChange();
+				}
+			}
+		}
+
+		return (Serializable) entityId;
+	}
+
+	/**
+	 * This method adds a new property to all items in the container. The property id, data type and default value of
+	 * the new Property are given as parameters. HbnContainer automatically adds all fields that are mapped by Hibernate
+	 * to the database. With this method we can add a property to the container that is contained in the pojo but not
+	 * Hibernate mapped.
 	 */
 	@Override
 	public boolean addContainerProperty(Object propertyId, Class<?> classType, Object defaultValue)
@@ -629,76 +707,16 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 
 		try
 		{
-			// Determine if the property exists and if not, determine if it can be created.
 			new MethodProperty<Object>(this.entityType.newInstance(), propertyId.toString());
 		}
 		catch (Exception e)
 		{
-			logger.debug("Note: this is not an error: " + StackToString(e));
+			logger.debug("Note: this is not an error: " + unwindStack(e));
 			propertyExists = false;
 		}
 
 		addedProperties.put(propertyId.toString(), classType);
 		return propertyExists;
-	}
-
-	/**
-	 * This is an HbnContainer specific method to persist a newly created entity. This method will trigger a cache clear
-	 * and will also fire an item set change event.
-	 */
-	public Serializable saveEntity(T entity)
-	{
-		final Session session = sessionFactory.getCurrentSession();
-		final Serializable entityId = session.save(entity);
-
-		clearInternalCache();
-		fireItemSetChange();
-
-		return entityId;
-	}
-
-	/**
-	 * This is an HbnContainer specific method to update an entity. This method takes care of updating the cache
-	 * appropriately as well as firing value change events when necessary.
-	 */
-	public Serializable updateEntity(T entity)
-	{
-		final Session session = sessionFactory.getCurrentSession();
-		session.update(entity);
-
-		EntityItem<T> cachedEntity = null;
-		final Serializable entityId = (Serializable) getIdForPojo(entity);
-
-		if (entityCache != null) // Refresh the entity cache
-		{
-			final WeakReference<EntityItem<T>> weakReference = entityCache.get(entityId);
-
-			if (weakReference != null)
-			{
-				cachedEntity = weakReference.get();
-
-				if (cachedEntity != null) // May be already collected but not cleaned
-					cachedEntity.pojo = entity;
-			}
-		}
-
-		if (cachedEntity != null) // If it was in cache it might be rendered
-		{
-			for (Object propertyId : cachedEntity.getItemPropertyIds())
-			{
-				// fire change events on this item, properties might have changed
-				final Property<?> property = cachedEntity.getItemProperty(propertyId);
-
-				if (property instanceof EntityItem.EntityItemProperty)
-				{
-					@SuppressWarnings("rawtypes")
-					final EntityItemProperty entityProperty = (EntityItemProperty) property;
-					entityProperty.fireValueChange();
-				}
-			}
-		}
-
-		return entityId;
 	}
 
 	/**
@@ -711,18 +729,12 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	{
 		try
 		{
-			final Object entity = entityType.newInstance();
-			final Session session = sessionFactory.getCurrentSession();
-			final Object entityId = session.save(entity);
-
-			clearInternalCache();
-			fireItemSetChange();
-
-			return entityId;
+			final T entity = entityType.newInstance();
+			return saveEntity(entity);
 		}
 		catch (Exception e)
 		{
-			logger.error(StackToString(e));
+			logger.error(unwindStack(e));
 			return null;
 		}
 	}
@@ -750,13 +762,12 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	{
 		try
 		{
-			final Session session = sessionFactory.getCurrentSession();
-			final Object entity = session.get(entityType, (Serializable) entityId);
+			final EntityItem<T> entity = cache.get(entityId);
 			return (entity != null);
 		}
 		catch (Exception e)
 		{
-			logger.debug(StackToString(e)); // not an error
+			logger.error(unwindStack(e));
 			return false;
 		}
 	}
@@ -770,13 +781,13 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	{
 		try
 		{
-			EntityItem<?> entity = getItem(entityId);
+			EntityItem<?> entity = cache.get(entityId);
 			Property<?> property = entity.getItemProperty(propertyId);
 			return property;
 		}
 		catch (Exception e)
 		{
-			logger.debug(StackToString(e)); // not an error
+			logger.error(unwindStack(e));
 			return null;
 		}
 	}
@@ -824,7 +835,15 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public EntityItem<T> getItem(Object entityId)
 	{
-		return loadEntity((Serializable) entityId);
+		try
+		{
+			return cache.get(entityId);
+		}
+		catch (ExecutionException e)
+		{
+			logger.error(unwindStack(e));
+			return null;
+		}
 	}
 
 	/**
@@ -914,7 +933,9 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		{
 			final Session session = sessionFactory.getCurrentSession();
 			final Query query = session.createQuery("DELETE FROM " + entityType.getSimpleName());
-			int deleted = query.executeUpdate();
+
+			final int deleted = query.executeUpdate();
+			cache.invalidateAll();
 
 			if (deleted > 0)
 			{
@@ -926,7 +947,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(StackToString(e));
+			logger.error(unwindStack(e));
 			return false;
 		}
 	}
@@ -958,6 +979,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		final Object entity = session.load(entityType, (Serializable) entityId);
 
 		session.delete(entity);
+		cache.invalidate(entityId);
 
 		clearInternalCache();
 		fireItemSetChange();
@@ -1057,26 +1079,32 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object nextItemId(Object entityId)
 	{
-		final EntityItem<T> entity = new EntityItem<T>((Serializable) entityId);
-		final List<T> rowBuffer = getRowBuffer();
+		EntityItem<T> entity = null;
+		List<T> rowBuffer = null;
 
 		try
 		{
-			final int index = rowBuffer.indexOf(entity.getPojo());
+			entity = cache.get(entityId);
+			rowBuffer = getRowBuffer();
+		}
+		catch (Exception e)
+		{
+			logger.error(unwindStack(e));
+			return null;
+		}
 
-			if (index != -1)
+		try
+		{
+			int index;
+			if ((index = rowBuffer.indexOf(entity.getPojo())) != -1)
 			{
 				final T nextEntity = rowBuffer.get(index + 1);
 				return getIdForPojo(nextEntity);
 			}
 		}
-		catch (Exception e) // not in buffer
+		catch (Exception e) // entityId is not in rowBuffer, suppress the exception
 		{
-			// TODO: hackish... refactor...
 		}
-
-		// entityId was not in the row buffer so build query with current order and limit result set with the reference
-		// row. Then first result is next item.
 
 		int currentIndex = indexOfId(entityId);
 		int size = size();
@@ -1084,7 +1112,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		int firstIndex = (normalOrder)
 				? currentIndex + 1
 				: size - currentIndex;
-		
+
 		if (firstIndex < 0 || firstIndex >= size)
 			return null;
 
@@ -1257,19 +1285,27 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	public Collection<?> getChildren(Object entityId)
 	{
 		final ArrayList<Object> children = new ArrayList<Object>();
-		parentPropertyName = getParentPropertyName();
 
-		if (parentPropertyName == null)
-			return children;
-
-		for (Object id : getItemIds())
+		try
 		{
-			EntityItem<T> entity = getItem(id);
-			Property<?> property = entity.getItemProperty(parentPropertyName);
-			Object value = property.getValue();
+			parentPropertyName = getParentPropertyName();
 
-			if (entityId.equals(value))
-				children.add(id);
+			if (parentPropertyName == null)
+				return children;
+
+			for (Object id : getItemIds())
+			{
+				EntityItem<T> entity = cache.get(id);
+				Property<?> property = entity.getItemProperty(parentPropertyName);
+				Object value = property.getValue();
+
+				if (entityId.equals(value))
+					children.add(id);
+			}
+		}
+		catch (Exception e)
+		{
+			logger.error(unwindStack(e));
 		}
 
 		return children;
@@ -1282,19 +1318,27 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object getParent(Object entityId)
 	{
-		parentPropertyName = getParentPropertyName();
-
-		if (parentPropertyName == null)
+		try
 		{
-			logger.warn("failed to find a parent property name; hierarchy may be incomplete.");
+			parentPropertyName = getParentPropertyName();
+
+			if (parentPropertyName == null)
+			{
+				logger.warn("failed to find a parent property name; hierarchy may be incomplete.");
+				return null;
+			}
+
+			final EntityItem<T> entity = cache.get(entityId);
+			final Property<?> property = entity.getItemProperty(parentPropertyName);
+			final Object value = property.getValue();
+
+			return value;
+		}
+		catch (Exception e)
+		{
+			logger.error(unwindStack(e));
 			return null;
 		}
-
-		final EntityItem<T> entity = getItem(entityId);
-		final Property<?> property = entity.getItemProperty(parentPropertyName);
-		final Object value = property.getValue();
-
-		return value;
 	}
 
 	/**
@@ -1305,24 +1349,32 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	public Collection<?> rootItemIds()
 	{
 		final ArrayList<Object> rootItems = new ArrayList<Object>();
-		parentPropertyName = getParentPropertyName();
 
-		if (parentPropertyName == null)
+		try
 		{
-			logger.warn("failed to find a parent property name; hierarchy may be incomplete.");
-			return rootItems;
+			parentPropertyName = getParentPropertyName();
+
+			if (parentPropertyName == null)
+			{
+				logger.warn("failed to find a parent property name; hierarchy may be incomplete.");
+				return rootItems;
+			}
+
+			final Collection<?> allItemIds = getItemIds();
+
+			for (Object id : allItemIds)
+			{
+				EntityItem<T> entity = cache.get(id);
+				Property<?> property = entity.getItemProperty(parentPropertyName);
+				Object value = property.getValue();
+
+				if (value == null)
+					rootItems.add(id);
+			}
 		}
-		
-		final Collection<?> allItemIds = getItemIds();
-
-		for (Object id : allItemIds)
+		catch (Exception e)
 		{
-			EntityItem<T> entity = getItem(id);
-			Property<?> property = entity.getItemProperty(parentPropertyName);
-			Object value = property.getValue();
-
-			if (value == null)
-				rootItems.add(id);
+			logger.error(unwindStack(e));
 		}
 
 		return rootItems;
@@ -1336,21 +1388,29 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean setParent(Object entityId, Object newParentId)
 	{
-		parentPropertyName = getParentPropertyName();
-
-		if (parentPropertyName == null)
+		try
 		{
-			logger.warn("failed to find a parent property name; unable to set the parent.");
+			parentPropertyName = getParentPropertyName();
+
+			if (parentPropertyName == null)
+			{
+				logger.warn("failed to find a parent property name; unable to set the parent.");
+				return false;
+			}
+
+			final EntityItem<T> item = cache.get(entityId);
+			final Property<?> property = item.getItemProperty(parentPropertyName);
+
+			property.setValue(newParentId);
+			final Object value = property.getValue();
+
+			return (value.equals(newParentId));
+		}
+		catch (Exception e)
+		{
+			logger.error(unwindStack(e));
 			return false;
 		}
-
-		final EntityItem<T> item = getItem(entityId);
-		final Property<?> property = item.getItemProperty(parentPropertyName);
-
-		property.setValue(newParentId);
-
-		final Object value = property.getValue();
-		return (value.equals(newParentId));
 	}
 
 	/**
@@ -1386,19 +1446,27 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean isRoot(Object entityId)
 	{
-		parentPropertyName = getParentPropertyName();
-
-		if (parentPropertyName == null)
+		try
 		{
-			logger.warn("failed to find a parent property name; hierarchy may be incomplete.");
+			parentPropertyName = getParentPropertyName();
+
+			if (parentPropertyName == null)
+			{
+				logger.warn("failed to find a parent property name; hierarchy may be incomplete.");
+				return false;
+			}
+
+			final EntityItem<T> item = cache.get(entityId);
+			final Property<?> property = item.getItemProperty(parentPropertyName);
+			final Object value = property.getValue();
+
+			return (value == null);
+		}
+		catch (Exception e)
+		{
+			logger.error(unwindStack(e));
 			return false;
 		}
-
-		final EntityItem<T> item = getItem(entityId);
-		final Property<?> property = item.getItemProperty(parentPropertyName);
-
-		final Object value = property.getValue();
-		return (value == null);
 	}
 
 	/**
@@ -1410,25 +1478,33 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean hasChildren(Object entityId)
 	{
-		parentPropertyName = getParentPropertyName();
-
-		if (parentPropertyName == null)
+		try
 		{
-			logger.warn("failed to find a parent property name; hierarchy may be incomplete.");
+			parentPropertyName = getParentPropertyName();
+
+			if (parentPropertyName == null)
+			{
+				logger.warn("failed to find a parent property name; hierarchy may be incomplete.");
+				return false;
+			}
+
+			for (Object id : getItemIds())
+			{
+				EntityItem<T> item = cache.get(id);
+				Property<?> property = item.getItemProperty(parentPropertyName);
+				Object value = property.getValue();
+
+				if (entityId.equals(value))
+					return true;
+			}
+
 			return false;
 		}
-
-		for (Object id : getItemIds())
+		catch (Exception e)
 		{
-			EntityItem<T> item = getItem(id);
-			Property<?> property = item.getItemProperty(parentPropertyName);
-			Object value = property.getValue();
-
-			if (entityId.equals(value))
-				return true;
+			logger.error(unwindStack(e));
+			return false;
 		}
-
-		return false;
 	}
 
 	/**
@@ -1500,34 +1576,6 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContainer utility method. Fetches entities by identifier. Override this if you need to
-	 * customize a query for EntityItems.
-	 */
-	protected EntityItem<T> loadEntity(Serializable entityId)
-	{
-		if (entityId == null)
-			return null;
-
-		cleanCache();
-
-		EntityItem<T> entity;
-		WeakReference<EntityItem<T>> weakReference = entityCache.get(entityId);
-
-		if (weakReference != null)
-		{
-			entity = weakReference.get();
-
-			if (entity != null)
-				return entity;
-		}
-
-		entity = new EntityItem<T>(entityId);
-		entityCache.put(entityId, new WeakReference<EntityItem<T>>(entity));
-
-		return entity;
-	}
-
-	/**
 	 * This is an internal HbnContainer utility method. This method triggers events associated with the
 	 * ItemSetChangeListener.
 	 */
@@ -1572,8 +1620,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContainer utility method. Return the ordering criteria in the order in which they should be
-	 * applied. The composed order must be stable and must include {@link #getNaturalOrder(boolean)} at the end.
+	 * This is an internal HbnContainer utility method. Return the ordering criteria in the order in which they should
+	 * be applied. The composed order must be stable and must include {@link #getNaturalOrder(boolean)} at the end.
 	 */
 	protected final List<Order> getOrder(boolean flipOrder)
 	{
@@ -1649,7 +1697,10 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	protected Order getNaturalOrder(boolean flipOrder)
 	{
 		final String propertyName = getIdPropertyName();
-		return (flipOrder) ? Order.desc(propertyName) : Order.asc(propertyName);
+
+		return (flipOrder)
+				? Order.desc(propertyName)
+				: Order.asc(propertyName);
 	}
 
 	/**
@@ -1659,14 +1710,9 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	{
 		if (bypassCache)
 		{
-			Object first = getCriteria()
-					.setMaxResults(1)
-					.setCacheable(true)
-					.uniqueResult();
-
+			final Object first = getCriteria().setMaxResults(1).setCacheable(true).uniqueResult();
 			final Object entityId = getIdForPojo(first);
 			idToIndex.put(entityId, normalOrder ? 0 : size() - 1);
-
 			return entityId;
 		}
 
@@ -1683,8 +1729,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContainer utility method. RowBuffer stores a list of entity items to avoid excessive number
-	 * of DB queries.
+	 * This is an internal HbnContainer utility method. RowBuffer stores a list of entity items to avoid excessive
+	 * number of DB queries.
 	 */
 	private List<T> getRowBuffer()
 	{
@@ -1747,8 +1793,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * This is an internal HbnContainer utility method. Adds container filter for hibernate mapped property. For property
-	 * not mapped by Hibernate.
+	 * This is an internal HbnContainer utility method. Adds container filter for hibernate mapped property. For
+	 * property not mapped by Hibernate.
 	 */
 	public void addContainerFilter(Object propertyId, String filterString, boolean ignoreCase, boolean onlyMatchPrefix)
 	{
@@ -1840,40 +1886,6 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		return parentPropertyName;
 	}
 
-	//
-	// CACHE RELATED METHODS
-	//
-
-	/**
-	 * This is an internal HbnContainer utility method. Cleans the entityCache of collected item references. This method
-	 * runs occasionally by {@link #loadEntity(Serializable)}, but may be run manually too.
-	 * 
-	 * <p>
-	 * TODO figure out if this is the best possible way to free the memory consumed by (empty) weak references and open
-	 * this mechanism for extension
-	 */
-	private void cleanCache()
-	{
-		// TODO: substitute a Google Guava cache for this home-grown alternative.
-
-		if (++loadCount % REFERENCE_CLEANUP_INTERVAL == 0)
-		{
-			final Set<Entry<Object, WeakReference<EntityItem<T>>>> entries = entityCache.entrySet();
-			Iterator<Entry<Object, WeakReference<EntityItem<T>>>> iterator;
-
-			for (iterator = entries.iterator(); iterator.hasNext();)
-			{
-				Entry<Object, WeakReference<EntityItem<T>>> entry = iterator.next();
-
-				if (entry.getValue().get() == null)
-				{
-					// if the referenced entityitem is carbage collected, remove the weak reference itself
-					iterator.remove();
-				}
-			}
-		}
-	}
-
 	/**
 	 * This is an internal HbnContainer utility method to clear all cache fields.
 	 */
@@ -1887,5 +1899,4 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		lastId = null;
 		size = null;
 	}
-
 }
