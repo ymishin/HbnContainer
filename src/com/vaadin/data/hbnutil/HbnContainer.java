@@ -86,6 +86,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	private HashSet<ContainerFilter> filters;
 	private final Map<String, Class<?>> addedProperties = new HashMap<String, Class<?>>();
 	private final LoadingCache<Object, EntityItem<T>> cache;
+	private final HashMap<Object, Boolean> embeddedPropertiesCache = new HashMap<Object, Boolean>();
 
 	/**
 	 * Item wrappping a Hibernate mapped entity object. EntityItems are generally instantiated automatically by
@@ -160,222 +161,142 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		 * EntityItemProperty wraps one Hibernate controlled field of the pojo used by EntityItem. For common fields the
 		 * field value is the same as Property value. For relation fields it is the identifier of related object or a
 		 * collection of identifiers.
+		 * 
+		 * The Property is a simple data object that contains one typed value. This interface contains methods to
+		 * inspect and modify the stored value and its type, and the object's read-only state.
+		 * 
+		 * The Property also defines the events ReadOnlyStatusChangeEvent and ValueChangeEvent, and the associated
+		 * listener and notifier interfaces.
+		 * 
+		 * The Property.Viewer interface should be used to attach the Property to an external data source. This way the
+		 * value in the data source can be inspected using the Property interface.
+		 * 
+		 * The Property.editor interface should be implemented if the value needs to be changed through the implementing
+		 * class.
 		 */
 		@SuppressWarnings("rawtypes")
 		public class EntityItemProperty implements Property, Property.ValueChangeNotifier
 		{
-
 			private static final long serialVersionUID = -4086774943938055297L;
-			private final String propertyName;
+			private List<ValueChangeListener> valueChangeListeners;
+			private String propertyName;
 
+			/**
+			 * Default Constructor.
+			 */
 			public EntityItemProperty(String propertyName)
 			{
 				this.propertyName = propertyName;
 			}
 
-			public EntityItem<T> getEntityItem()
-			{
-				return EntityItem.this;
-			}
-
-			public T getPojo()
-			{
-				return pojo;
-			}
-
 			/**
-			 * A helper method to get raw type of this (Hibernate) property.
-			 * 
-			 * @return the raw type of field
+			 * This method gets the value that is stored by the property. The returned object is compatible with the
+			 * class returned by getType().
 			 */
-			private Type getPropertyType()
-			{
-				return classMetadata.getPropertyType(propertyName);
-			}
-
-			private boolean propertyInEmbeddedKey()
-			{
-				// TODO a place for optimization, this is not needed to be done
-				// for each separate property
-				Type idType = classMetadata.getIdentifierType();
-				if (idType.isComponentType())
-				{
-					ComponentType idComponent = (ComponentType) idType;
-					String[] idPropertyNames = idComponent.getPropertyNames();
-					List<String> idPropertyNameList = Arrays.asList(idPropertyNames);
-					if (idPropertyNameList.contains(propertyName))
-					{
-						return true;
-					}
-					else
-					{
-						return false;
-					}
-				}
-				else
-				{
-					return false;
-				}
-			}
-
-			public Class<?> getType()
-			{
-				// TODO clean, optimize, review
-
-				if (propertyInEmbeddedKey())
-				{
-					ComponentType idType = (ComponentType) classMetadata.getIdentifierType();
-					String[] propertyNames = idType.getPropertyNames();
-					for (int i = 0; i < propertyNames.length; i++)
-					{
-						String name = propertyNames[i];
-						if (name.equals(propertyName))
-						{
-							try
-							{
-								String idName = classMetadata.getIdentifierPropertyName();
-								Field idField = entityType.getDeclaredField(idName);
-								Field propertyField = idField.getType().getDeclaredField(propertyName);
-								return propertyField.getType();
-							}
-							catch (NoSuchFieldException ex)
-							{
-								throw new RuntimeException("Could not find the type of specified container property.",
-										ex);
-							}
-						}
-					}
-				}
-
-				Type propertyType = getPropertyType();
-				if (propertyType.isCollectionType())
-				{
-					/*
-					 * For collection types the Property value is the same type of collection, but containing
-					 * identifiers instead of the actual referenced objects.
-					 */
-					Class<?> returnedClass = propertyType.getReturnedClass();
-					return returnedClass;
-				}
-				else if (propertyType.isAssociationType())
-				{
-					/*
-					 * For association the the property value type is the type of referenced types identifier. Use
-					 * Hibernates ClassMetadata for referenced type and get the type of its identifier.
-					 */
-					// TODO clean, optimize, review, this could be optimized
-					// among similar properties
-					ClassMetadata classMetadata2 = sessionFactory.getClassMetadata(classMetadata.getPropertyType(
-							propertyName).getReturnedClass());
-					return classMetadata2.getIdentifierType().getReturnedClass();
-
-				}
-				else
-				{
-					/*
-					 * For basic fields the Property type is the same as the type in entity class.
-					 */
-					return classMetadata.getPropertyType(propertyName).getReturnedClass();
-				}
-			}
-
 			@SuppressWarnings("unchecked")
+			@Override
 			public Object getValue()
 			{
+				final Session session = sessionFactory.getCurrentSession();
+				final SessionImplementor sessionImplementor = (SessionImplementor) session;
 
-				// TODO clean, optimize, review
-
-				// Ensure we have an attached pojo
 				if (!sessionFactory.getCurrentSession().contains(pojo))
-				{
-					pojo = (T) sessionFactory.getCurrentSession().get(entityType, (Serializable) getIdForPojo(pojo));
-				}
+					pojo = (T) session.get(entityType, (Serializable) getIdForPojo(pojo));
 
-				if (propertyInEmbeddedKey())
+				if (propertyInEmbeddedKey(propertyName))
 				{
-					ComponentType idType = (ComponentType) classMetadata.getIdentifierType();
-					String[] propertyNames = idType.getPropertyNames();
+					final ComponentType identifierType = (ComponentType) classMetadata.getIdentifierType();
+					final String[] propertyNames = identifierType.getPropertyNames();
+
 					for (int i = 0; i < propertyNames.length; i++)
 					{
 						String name = propertyNames[i];
+
 						if (name.equals(propertyName))
 						{
-							Object id = classMetadata.getIdentifier(pojo,
-									(SessionImplementor) sessionFactory.getCurrentSession());
-							return idType.getPropertyValue(id, i, EntityMode.POJO);
+							final Object id = classMetadata.getIdentifier(pojo, sessionImplementor);
+							return identifierType.getPropertyValue(id, i, EntityMode.POJO);
 						}
 					}
 				}
 
-				Type propertyType = getPropertyType();
-				Object propertyValue = classMetadata.getPropertyValue(pojo, propertyName);
+				final Type propertyType = getPropertyType();
+				final Object propertyValue = classMetadata.getPropertyValue(pojo, propertyName);
 
 				if (!propertyType.isAssociationType())
-				{
 					return propertyValue;
-				}
-				else if (propertyType.isCollectionType())
+
+				if (propertyType.isCollectionType())
 				{
 					if (propertyValue == null)
-					{
 						return null;
-					}
 
-					/*
-					 * Build a HashSet of identifiers of entities stored in collection.
-					 */
-					HashSet<Serializable> identifiers = new HashSet<Serializable>();
-					Collection<?> pojos = (Collection<?>) propertyValue;
+					final HashSet<Serializable> identifiers = new HashSet<Serializable>();
+					final Collection<?> pojos = (Collection<?>) propertyValue;
 
 					for (Object object : pojos)
 					{
-						// here, object must be of an association type
-						if (!sessionFactory.getCurrentSession().contains(object))
-						{
-							// ensure a fresh object if session contains the
-							// object
-							object = sessionFactory.getCurrentSession().merge(object);
-						}
-						identifiers.add(sessionFactory.getCurrentSession().getIdentifier(object));
+						if (!session.contains(object))
+							object = session.merge(object);
+
+						identifiers.add(session.getIdentifier(object));
 					}
+
 					return identifiers;
 				}
-				else
-				{
-					/*
-					 * the return value will be the identifier of referenced object
-					 */
-					if (propertyValue == null)
-					{
-						return null;
-					}
-					Class<?> propertyTypeClass = propertyType.getReturnedClass();
 
-					ClassMetadata classMetadata2 = sessionFactory.getClassMetadata(propertyTypeClass);
+				if (propertyValue == null)
+					return null;
 
-					Serializable identifier = classMetadata2.getIdentifier(propertyValue,
-							(SessionImplementor) sessionFactory.getCurrentSession());
-					return identifier;
-				}
+				final Class<?> propertyTypeClass = propertyType.getReturnedClass();
+				final ClassMetadata metadata = sessionFactory.getClassMetadata(propertyTypeClass);
+				final Serializable identifier = metadata.getIdentifier(propertyValue, sessionImplementor);
+
+				return identifier;
 			}
 
+			/**
+			 * This method tests if the Property is in read-only mode. In read-only mode calls to the method setValue
+			 * will throw ReadOnlyException and will not modify the value of the Property.
+			 */
+			@Override
 			public boolean isReadOnly()
 			{
-				// TODO
 				return false;
 			}
 
+			/**
+			 * This method sets the property's read-only mode to the specified status. This functionality is optional,
+			 * but all properties must implement the isReadOnly mode query correctly.
+			 * 
+			 * HbnContainer does not implement this functionality and will throw an UnsupportedOperationException of
+			 * this method is called.
+			 */
+			@Override
 			public void setReadOnly(boolean newStatus)
 			{
 				throw new UnsupportedOperationException();
 			}
 
+			/**
+			 * This method sets the value of the property.
+			 * 
+			 * Implementing this functionality is optional. If the functionality is missing, one should declare the
+			 * Property to be in read-only mode and throw Property.ReadOnlyException in this function.
+			 * 
+			 * Note : Since Vaadin 7.0, setting the value of a non-String property as a String is no longer supported.
+			 */
+			@Override
 			public void setValue(Object newValue) throws ReadOnlyException, ConversionException
 			{
-
 				try
 				{
+					final Session session = sessionFactory.getCurrentSession();
+					final SessionImplementor sessionImplementor = (SessionImplementor) sessionFactory
+							.getCurrentSession();
+
 					Object value;
+
 					try
 					{
 						if (newValue == null || getType().isAssignableFrom(newValue.getClass()))
@@ -384,73 +305,62 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 						}
 						else
 						{
-							// Gets the string constructor
 							final Constructor<?> constr = getType().getConstructor(new Class[] { String.class });
-
 							value = constr.newInstance(new Object[] { newValue.toString() });
 						}
 
-						// TODO same optimizations (caching introspection of
-						// types) as in getType and getValue
-						// could be done here.
-
-						if (propertyInEmbeddedKey())
+						if (propertyInEmbeddedKey(propertyName))
 						{
-							ComponentType idType = (ComponentType) classMetadata.getIdentifierType();
-							String[] propertyNames = idType.getPropertyNames();
+							final ComponentType identifierType = (ComponentType) classMetadata.getIdentifierType();
+							final String[] propertyNames = identifierType.getPropertyNames();
+
 							for (int i = 0; i < propertyNames.length; i++)
 							{
 								String name = propertyNames[i];
+
 								if (name.equals(propertyName))
 								{
-									Object id = classMetadata.getIdentifier(pojo,
-											(SessionImplementor) sessionFactory.getCurrentSession());
-									Object[] values = idType.getPropertyValues(id, EntityMode.POJO);
+									final Object identifier = classMetadata.getIdentifier(pojo, sessionImplementor);
+									final Object[] values = identifierType.getPropertyValues(identifier,
+											EntityMode.POJO);
+
 									values[i] = value;
-									idType.setPropertyValues(id, values, EntityMode.POJO);
+									identifierType.setPropertyValues(identifier, values, EntityMode.POJO);
 								}
 							}
 						}
 						else
 						{
-							Type propertyType = classMetadata.getPropertyType(propertyName);
+							final Type propertyType = classMetadata.getPropertyType(propertyName);
+
 							if (propertyType.isCollectionType())
 							{
-								/*
-								 * Value is a collection of identifiers of referenced objects.
-								 */
-								// TODO figure out how to fetch mapped type
-								// properly
-								Field declaredField = entityType.getDeclaredField(propertyName);
-								java.lang.reflect.Type genericType = declaredField.getGenericType();
-								java.lang.reflect.Type[] actualTypeArguments = ((ParameterizedType) genericType)
-										.getActualTypeArguments();
+								final Field declaredField = entityType.getDeclaredField(propertyName);
+								final java.lang.reflect.Type genericType = declaredField.getGenericType();
+								final java.lang.reflect.Type[] actualTypeArguments =
+										((ParameterizedType) genericType).getActualTypeArguments();
+								final java.lang.reflect.Type assosiatedType = actualTypeArguments[0];
+								final String typestring = assosiatedType.toString().substring(6);
 
-								java.lang.reflect.Type assosiatedType = actualTypeArguments[0];
-								String typestring = assosiatedType.toString().substring(6);
+								// Reuse existing persistent collection if possible so Hibernate may optimize queries
+								// properly.
 
-								/*
-								 * Reuse existing persistent collection if possible so Hibernate may optimize queries
-								 * properly.
-								 */
 								@SuppressWarnings("unchecked")
 								Collection<Object> pojoCollection = (Collection<Object>) classMetadata
 										.getPropertyValue(pojo, propertyName);
+
 								if (pojoCollection == null)
 								{
 									pojoCollection = new HashSet<Object>();
 									classMetadata.setPropertyValue(pojo, propertyName, pojoCollection);
 								}
-								// copy existing set, so we can track which are
-								// to be removed
-								Collection<Object> orphans = new HashSet<Object>(pojoCollection);
 
-								Collection<?> identifiers = (Collection<?>) value;
-								Session session = sessionFactory.getCurrentSession();
-								// add missing objects
+								final Collection<Object> orphans = new HashSet<Object>(pojoCollection);
+								final Collection<?> identifiers = (Collection<?>) value;
+
 								for (Object id : identifiers)
 								{
-									Object object = session.get(typestring, (Serializable) id);
+									final Object object = session.get(typestring, (Serializable) id);
 									if (!pojoCollection.contains(object))
 									{
 										pojoCollection.add(object);
@@ -460,66 +370,186 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 										orphans.remove(object);
 									}
 								}
-								// remove the ones that are no more supposed to
-								// be in collection
-								pojoCollection.removeAll(orphans);
 
+								pojoCollection.removeAll(orphans);
 							}
 							else if (propertyType.isAssociationType())
 							{
-								/*
-								 * Property value is identifier, convert to the referenced type
-								 */
-								Class<?> referencedType = classMetadata.getPropertyType(propertyName)
+								final Class<?> referencedType = classMetadata
+										.getPropertyType(propertyName)
 										.getReturnedClass();
-								Object object = sessionFactory.getCurrentSession().get(referencedType,
-										(Serializable) value);
+
+								final Object object = sessionFactory
+										.getCurrentSession()
+										.get(referencedType, (Serializable) value);
+
 								classMetadata.setPropertyValue(pojo, propertyName, object);
-								// TODO check if these are needed
 								sessionFactory.getCurrentSession().merge(object);
 								sessionFactory.getCurrentSession().saveOrUpdate(pojo);
-
 							}
 							else
 							{
 								classMetadata.setPropertyValue(pojo, propertyName, value);
 							}
 						}
-						// Persist (possibly) detached pojo
+
 						@SuppressWarnings("unchecked")
-						T newPojo = (T) sessionFactory.getCurrentSession().merge(pojo);
+						T newPojo = (T) session.merge(pojo);
 						pojo = newPojo;
 
 						fireValueChange();
-
 					}
-					catch (final java.lang.Exception e)
+					catch (Exception e)
 					{
-						e.printStackTrace();
+						logger.error(unwindStack(e));
 						throw new ConversionException(e);
 					}
-
 				}
 				catch (HibernateException e)
 				{
-					e.printStackTrace();
+					logger.error(unwindStack(e));
 				}
 			}
 
+			/**
+			 * This method registers a new value change listener for this property.
+			 */
+			@Override
+			public void addListener(ValueChangeListener listener)
+			{
+				if (valueChangeListeners == null)
+					valueChangeListeners = new LinkedList<ValueChangeListener>();
+
+				if (!valueChangeListeners.contains(listener))
+					valueChangeListeners.add(listener);
+			}
+
+			/**
+			 * This method removes a previously registered value change listener.
+			 */
+			@Override
+			public void removeListener(ValueChangeListener listener)
+			{
+				if (valueChangeListeners != null)
+					valueChangeListeners.remove(listener);
+			}
+
+			/**
+			 * This method registers a new value change listener for this property.
+			 */
+			@Override
+			public void addValueChangeListener(ValueChangeListener listener)
+			{
+				addListener(listener);
+			}
+
+			/**
+			 * This method removes a previously registered value change listener.
+			 */
+			@Override
+			public void removeValueChangeListener(ValueChangeListener listener)
+			{
+				removeListener(listener);
+			}
+
+			/**
+			 * This method returns a string representation of the object. In general, the toString method returns a
+			 * string that "textually represents" this object. The result should be a concise but informative
+			 * representation that is easy for a person to read. It is recommended that all subclasses override this
+			 * method.
+			 * 
+			 * The toString method for class Object returns a string consisting of the name of the class of which the
+			 * object is an instance, the at-sign character `@', and the unsigned hexadecimal representation of the hash
+			 * code of the object. In other words, this method returns a string equal to the value of:
+			 * 
+			 * getClass().getName() + '@' + Integer.toHexString(hashCode())
+			 */
 			@Override
 			public String toString()
 			{
-				Object v = getValue();
-				if (v != null)
-				{
-					return v.toString();
-				}
-				else
-				{
-					return null;
-				}
+				final Object value = getValue();
+				return (value != null) ? value.toString() : null;
 			}
 
+			/**
+			 * This method returns a reference to the containing EntityItem.
+			 */
+			public EntityItem<T> getEntityItem()
+			{
+				return EntityItem.this;
+			}
+
+			/**
+			 * This method returns a reference to the associated pojo.
+			 */
+			public T getPojo()
+			{
+				return pojo;
+			}
+
+			/**
+			 * This method returns the raw type of this property.
+			 */
+			private Type getPropertyType()
+			{
+				return classMetadata.getPropertyType(propertyName);
+			}
+
+			/**
+			 * Returns the type of the Property. The methods getValue and setValue must be compatible with this type:
+			 * one must be able to safely cast the value returned from getValue to the given type and pass any variable
+			 * assignable to this type as an argument to setValue.
+			 */
+			public Class<?> getType()
+			{
+				if (propertyInEmbeddedKey(propertyName))
+				{
+					final ComponentType idType = (ComponentType) classMetadata.getIdentifierType();
+					final String[] propertyNames = idType.getPropertyNames();
+
+					for (String name : propertyNames)
+					{
+						if (name.equals(propertyName))
+						{
+							try
+							{
+								final String identifierName = classMetadata.getIdentifierPropertyName();
+								final Field identifierField = entityType.getDeclaredField(identifierName);
+								final Field propertyField = identifierField.getType().getDeclaredField(propertyName);
+								return propertyField.getType();
+							}
+							catch (NoSuchFieldException e)
+							{
+								logger.error(unwindStack(e));
+								throw new RuntimeException("Failed to find the type of the container property.", e);
+							}
+						}
+					}
+				}
+
+				final Type propertyType = getPropertyType();
+
+				if (propertyType.isCollectionType())
+				{
+					final Class<?> returnedClass = propertyType.getReturnedClass();
+					return returnedClass;
+				}
+
+				if (propertyType.isAssociationType())
+				{
+					// For association the the property value type is the type of referenced types identifier.
+					final ClassMetadata metadata = sessionFactory.getClassMetadata(
+							classMetadata.getPropertyType(propertyName).getReturnedClass());
+
+					return metadata.getIdentifierType().getReturnedClass();
+				}
+
+				return classMetadata.getPropertyType(propertyName).getReturnedClass();
+			}
+
+			/**
+			 * Implements a value change event.
+			 */
 			private class HbnPropertyValueChangeEvent implements Property.ValueChangeEvent
 			{
 				private static final long serialVersionUID = 166764621324404579L;
@@ -530,55 +560,23 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 				}
 			}
 
-			private List<ValueChangeListener> valueChangeListeners;
-
+			/**
+			 * This method is used to fire a value change event.
+			 */
 			private void fireValueChange()
 			{
 				if (valueChangeListeners != null)
 				{
-					HbnPropertyValueChangeEvent event = new HbnPropertyValueChangeEvent();
-					Object[] array = valueChangeListeners.toArray();
+					final HbnPropertyValueChangeEvent event = new HbnPropertyValueChangeEvent();
+					final Object[] array = valueChangeListeners.toArray();
+
 					for (int i = 0; i < array.length; i++)
 					{
-						((ValueChangeListener) array[i]).valueChange(event);
+						final ValueChangeListener listener = (ValueChangeListener) array[i];
+						listener.valueChange(event);
 					}
 				}
 			}
-
-			public void addListener(ValueChangeListener listener)
-			{
-				if (valueChangeListeners == null)
-				{
-					valueChangeListeners = new LinkedList<ValueChangeListener>();
-				}
-				if (!valueChangeListeners.contains(listener))
-				{
-					valueChangeListeners.add(listener);
-				}
-			}
-
-			public void removeListener(ValueChangeListener listener)
-			{
-				if (valueChangeListeners != null)
-				{
-					valueChangeListeners.remove(listener);
-				}
-			}
-
-			@Override
-			public void addValueChangeListener(ValueChangeListener listener)
-			{
-				// TODO Auto-generated method stub
-
-			}
-
-			@Override
-			public void removeValueChangeListener(ValueChangeListener listener)
-			{
-				// TODO Auto-generated method stub
-
-			}
-
 		}
 	}
 
@@ -1560,7 +1558,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	private boolean propertyInEmbeddedKey(Object propertyId)
 	{
-		// TODO: combine with the same method from EntityItemProperty
+		if (embeddedPropertiesCache.containsKey(propertyId))
+			return embeddedPropertiesCache.get(propertyId);
 
 		final Type identifierType = classMetadata.getIdentifierType();
 
@@ -1898,5 +1897,6 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		firstId = null;
 		lastId = null;
 		size = null;
+		embeddedPropertiesCache.clear();
 	}
 }
