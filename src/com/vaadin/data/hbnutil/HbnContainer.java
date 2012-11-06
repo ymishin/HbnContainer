@@ -13,9 +13,7 @@
 
 package com.vaadin.data.hbnutil;
 
-import java.io.PrintWriter;
 import java.io.Serializable;
-import java.io.StringWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
@@ -32,8 +30,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.hibernate.Criteria;
 import org.hibernate.EntityMode;
 import org.hibernate.HibernateException;
@@ -63,7 +59,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		Container.Filterable, Container.Hierarchical, Container.ItemSetChangeNotifier, Container.Ordered
 {
 	private static final long serialVersionUID = -6410337120924382057L;
-	private Logger logger = LoggerFactory.getLogger(HbnContainer.class);
+	private ApplicationLogger logger = new ApplicationLogger(HbnContainer.class);
 
 	private SessionFactory sessionFactory;
 	private ClassMetadata classMetadata;
@@ -112,6 +108,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		@SuppressWarnings("unchecked")
 		public EntityItem(Serializable id)
 		{
+			logger.executionTrace();
+			
 			pojo = (T) sessionFactory.getCurrentSession().get(entityType, id);
 			// add non-hibernate mapped container properties
 			for (String propertyId : addedProperties.keySet())
@@ -125,18 +123,23 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		 */
 		public T getPojo()
 		{
+			logger.executionTrace();
 			return pojo;
 		}
 
 		@SuppressWarnings("rawtypes")
 		public boolean addItemProperty(Object id, Property property) throws UnsupportedOperationException
 		{
+			logger.executionTrace();
+			
 			properties.put(id, property);
 			return true;
 		}
 
 		public Property<?> getItemProperty(Object id)
 		{
+			logger.executionTrace();
+			
 			Property<?> p = properties.get(id);
 			if (p == null)
 			{
@@ -148,11 +151,15 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 
 		public Collection<?> getItemPropertyIds()
 		{
+			logger.executionTrace();
+			
 			return getContainerPropertyIds();
 		}
 
 		public boolean removeItemProperty(Object id) throws UnsupportedOperationException
 		{
+			logger.executionTrace();
+			
 			Property<?> removed = properties.remove(id);
 			return removed != null;
 		}
@@ -186,6 +193,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			 */
 			public EntityProperty(String propertyName)
 			{
+				logger.executionTrace();
+				
 				this.propertyName = propertyName;
 			}
 
@@ -197,6 +206,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			@Override
 			public Object getValue()
 			{
+				logger.executionTrace();
+				
 				final Session session = sessionFactory.getCurrentSession();
 				final SessionImplementor sessionImplementor = (SessionImplementor) session;
 
@@ -262,6 +273,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			@Override
 			public boolean isReadOnly()
 			{
+				logger.executionTrace();
+				
 				return false;
 			}
 
@@ -289,6 +302,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			@Override
 			public void setValue(Object newValue) throws ReadOnlyException, ConversionException
 			{
+				logger.executionTrace();
+				
 				try
 				{
 					final Session session = sessionFactory.getCurrentSession();
@@ -401,13 +416,13 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 					}
 					catch (Exception e)
 					{
-						logger.error(unwindStack(e));
+						logger.error(e);
 						throw new ConversionException(e);
 					}
 				}
 				catch (HibernateException e)
 				{
-					logger.error(unwindStack(e));
+					logger.error(e);
 				}
 			}
 
@@ -417,6 +432,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			@Override
 			public void addListener(ValueChangeListener listener)
 			{
+				logger.executionTrace();
+				
 				if (valueChangeListeners == null)
 					valueChangeListeners = new LinkedList<ValueChangeListener>();
 
@@ -430,6 +447,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			@Override
 			public void removeListener(ValueChangeListener listener)
 			{
+				logger.executionTrace();
+				
 				if (valueChangeListeners != null)
 					valueChangeListeners.remove(listener);
 			}
@@ -440,6 +459,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			@Override
 			public void addValueChangeListener(ValueChangeListener listener)
 			{
+				logger.executionTrace();
+				
 				addListener(listener);
 			}
 
@@ -449,6 +470,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			@Override
 			public void removeValueChangeListener(ValueChangeListener listener)
 			{
+				logger.executionTrace();
+				
 				removeListener(listener);
 			}
 
@@ -467,6 +490,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			@Override
 			public String toString()
 			{
+				logger.executionTrace();
+				
 				final Object value = getValue();
 				return (value != null) ? value.toString() : null;
 			}
@@ -476,6 +501,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			 */
 			public EntityItem<T> getEntityItem()
 			{
+				logger.executionTrace();
+				
 				return EntityItem.this;
 			}
 
@@ -484,6 +511,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			 */
 			public T getPojo()
 			{
+				logger.executionTrace();
+				
 				return pojo;
 			}
 
@@ -492,6 +521,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			 */
 			private Type getPropertyType()
 			{
+				logger.executionTrace();
+				
 				return classMetadata.getPropertyType(propertyName);
 			}
 
@@ -502,6 +533,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			 */
 			public Class<?> getType()
 			{
+				logger.executionTrace();
+				
 				if (propertyInEmbeddedKey(propertyName))
 				{
 					final ComponentType idType = (ComponentType) classMetadata.getIdentifierType();
@@ -520,7 +553,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 							}
 							catch (NoSuchFieldException e)
 							{
-								logger.error(unwindStack(e));
+								logger.error(e);
 								throw new RuntimeException("Failed to find the type of the container property.", e);
 							}
 						}
@@ -565,6 +598,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			 */
 			private void fireValueChange()
 			{
+				logger.executionTrace();
 				if (valueChangeListeners != null)
 				{
 					final HbnPropertyValueChangeEvent event = new HbnPropertyValueChangeEvent();
@@ -585,6 +619,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	public HbnContainer(Class<T> entityType, SessionFactory sessionFactory)
 	{
+		logger.executionTrace();
+		
 		this.entityType = entityType;
 		this.sessionFactory = sessionFactory;
 		this.classMetadata = sessionFactory.getClassMetadata(entityType);
@@ -605,31 +641,11 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 						}
 						catch (Exception e)
 						{
-							logger.error(unwindStack(e));
+							logger.error(e);
 							throw e;
 						}
 					}
 				});
-	}
-
-	/**
-	 * This method unwinds the call stack for the given exception and creates a human readable string that can be used
-	 * for logging or printing.
-	 */
-	protected String unwindStack(Throwable exception)
-	{
-		try
-		{
-			final StringWriter stringWriter = new StringWriter();
-			final PrintWriter printWriter = new PrintWriter(stringWriter);
-			exception.printStackTrace(printWriter);
-			return stringWriter.toString();
-		}
-		catch (Exception e)
-		{
-			logger.error(e.toString());
-			return "Stack Trace Unavailable: " + e.getMessage();
-		}
 	}
 
 	/**
@@ -638,6 +654,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	protected EntityItem<T> loadEntity(Serializable entityId)
 	{
+		logger.executionTrace();
+		
 		EntityItem<T> entity = null;
 
 		if (entityId != null)
@@ -651,6 +669,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	public Serializable saveEntity(T entity)
 	{
+		logger.executionTrace();
+		
 		final Session session = sessionFactory.getCurrentSession();
 		final Object entityId = session.save(entity);
 
@@ -666,6 +686,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	public Serializable updateEntity(T entity)
 	{
+		logger.executionTrace();
+		
 		final Session session = sessionFactory.getCurrentSession();
 		session.update(entity);
 
@@ -701,6 +723,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	public boolean addContainerProperty(Object propertyId, Class<?> classType, Object defaultValue)
 			throws UnsupportedOperationException
 	{
+		logger.executionTrace();
+		
 		boolean propertyExists = true;
 
 		try
@@ -709,7 +733,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.debug("Note: this is not an error: " + unwindStack(e));
+			logger.debug("Note: this is not an error: " + e);
 			propertyExists = false;
 		}
 
@@ -725,6 +749,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object addItem() throws UnsupportedOperationException
 	{
+		logger.executionTrace();
+		
 		try
 		{
 			final T entity = entityType.newInstance();
@@ -732,7 +758,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 			return null;
 		}
 	}
@@ -758,6 +784,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean containsId(Object entityId)
 	{
+		logger.executionTrace();
+		
 		try
 		{
 			final EntityItem<T> entity = cache.get(entityId);
@@ -765,7 +793,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 			return false;
 		}
 	}
@@ -777,6 +805,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Property<?> getContainerProperty(Object entityId, Object propertyId)
 	{
+		logger.executionTrace();
+		
 		try
 		{
 			EntityItem<?> entity = cache.get(entityId);
@@ -785,7 +815,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 			return null;
 		}
 	}
@@ -797,6 +827,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Collection<String> getContainerPropertyIds()
 	{
+		logger.executionTrace();
+		
 		Collection<String> propertyIds = getSortableContainerPropertyIds();
 		propertyIds.addAll(addedProperties.keySet());
 		return propertyIds;
@@ -808,6 +840,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	private Collection<String> getEmbeddedKeyPropertyIds()
 	{
+		logger.executionTrace();
+		
 		final ArrayList<String> embeddedKeyPropertyIds = new ArrayList<String>();
 		final Type identifierType = classMetadata.getIdentifierType();
 
@@ -833,13 +867,15 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public EntityItem<T> getItem(Object entityId)
 	{
+		logger.executionTrace();
+		
 		try
 		{
 			return cache.get(entityId);
 		}
 		catch (ExecutionException e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 			return null;
 		}
 	}
@@ -856,6 +892,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Collection<?> getItemIds()
 	{
+		logger.executionTrace();
+		
 		// TODO: BUG: does not preserve sort order!
 		final Criteria criteria = getCriteria();
 		criteria.setProjection(Projections.id());
@@ -874,6 +912,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public List<?> getItemIds(int startIndex, int count)
 	{
+		logger.executionTrace();
+		
 		final List<?> entityIds = (List<?>) getItemIds();
 		return entityIds.subList(startIndex, startIndex + count);
 	}
@@ -884,6 +924,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	public Class<?> getType(Object propertyId)
 	{
+		logger.executionTrace();
+		
 		// TODO: refactor to use same code as EntityItemProperty#getType()
 		// This will also fix incomplete implementation of this method (for association types). Not critical as
 		// Components don't really rely on this methods.
@@ -927,6 +969,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean removeAllItems() throws UnsupportedOperationException
 	{
+		logger.executionTrace();
+		
 		try
 		{
 			final Session session = sessionFactory.getCurrentSession();
@@ -945,7 +989,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 			return false;
 		}
 	}
@@ -957,6 +1001,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean removeContainerProperty(Object propertyId) throws UnsupportedOperationException
 	{
+		logger.executionTrace();
+		
 		final Class<?> removed = addedProperties.remove(propertyId);
 		return (removed != null);
 	}
@@ -970,6 +1016,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean removeItem(Object entityId) throws UnsupportedOperationException
 	{
+		logger.executionTrace();
+		
 		for (Object id : getChildren(entityId))
 			removeItem(id);
 
@@ -992,6 +1040,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public int size()
 	{
+		logger.executionTrace();
+		
 		size = ((Number) getBaseCriteria()
 				.setProjection(Projections.rowCount())
 				.uniqueResult())
@@ -1007,6 +1057,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object addItemAfter(Object previousEntityId) throws UnsupportedOperationException
 	{
+		logger.executionTrace();
+		
 		throw new UnsupportedOperationException();
 	}
 
@@ -1017,6 +1069,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Item addItemAfter(Object previousEntityId, Object newEntityId) throws UnsupportedOperationException
 	{
+		logger.executionTrace();
+		
 		throw new UnsupportedOperationException();
 	}
 
@@ -1026,6 +1080,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object firstItemId()
 	{
+		logger.executionTrace();
+		
 		firstId = firstItemId(true);
 		return firstId;
 	}
@@ -1036,6 +1092,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean isFirstId(Object entityId)
 	{
+		logger.executionTrace();
+		
 		return entityId.equals(firstItemId());
 	}
 
@@ -1045,6 +1103,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean isLastId(Object entityId)
 	{
+		logger.executionTrace();
 		return entityId.equals(lastItemId());
 	}
 
@@ -1054,6 +1113,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object lastItemId()
 	{
+		logger.executionTrace();
+		
 		if (lastId == null)
 		{
 			normalOrder = !normalOrder;
@@ -1077,6 +1138,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object nextItemId(Object entityId)
 	{
+		logger.executionTrace();
+		
 		EntityItem<T> entity = null;
 		List<T> rowBuffer = null;
 
@@ -1087,7 +1150,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 			return null;
 		}
 
@@ -1138,6 +1201,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object prevItemId(Object entityId)
 	{
+		logger.executionTrace();
+		
 		normalOrder = !normalOrder;
 		Object previous = nextItemId(entityId);
 		normalOrder = !normalOrder;
@@ -1168,6 +1233,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object getIdByIndex(int index)
 	{
+		logger.executionTrace();
+		
 		if (indexRowBuffer == null)
 			resetIndexRowBuffer(index);
 
@@ -1200,6 +1267,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public int indexOfId(Object entityId)
 	{
+		logger.executionTrace();
+		
 		final Integer index = idToIndex.get(entityId);
 
 		return (index == null)
@@ -1213,6 +1282,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Collection<String> getSortableContainerPropertyIds()
 	{
+		logger.executionTrace();
+		
 		final String[] propertyNames = classMetadata.getPropertyNames();
 		final LinkedList<String> propertyIds = new LinkedList<String>();
 
@@ -1231,6 +1302,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public void sort(Object[] propertyId, boolean[] ascending)
 	{
+		logger.executionTrace();
+		
 		clearInternalCache();
 		orderPropertyIds = propertyId;
 		orderAscendings = ascending;
@@ -1242,6 +1315,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public void removeAllContainerFilters()
 	{
+		logger.executionTrace();
+		
 		if (filters != null)
 		{
 			filters = null;
@@ -1261,6 +1336,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public void addContainerFilter(Filter filter) throws UnsupportedFilterException
 	{
+		logger.executionTrace();
+		
 		if (!(filter instanceof SimpleStringFilter))
 		{
 			final String message = "HbnContainer only supports old style addContainerFilter(Object, String, boolean booblean) API";
@@ -1282,6 +1359,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Collection<?> getChildren(Object entityId)
 	{
+		logger.executionTrace();
+		
 		final ArrayList<Object> children = new ArrayList<Object>();
 
 		try
@@ -1303,7 +1382,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 		}
 
 		return children;
@@ -1316,6 +1395,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Object getParent(Object entityId)
 	{
+		logger.executionTrace();
+		
 		try
 		{
 			parentPropertyName = getParentPropertyName();
@@ -1334,7 +1415,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 			return null;
 		}
 	}
@@ -1346,6 +1427,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public Collection<?> rootItemIds()
 	{
+		logger.executionTrace();
+		
 		final ArrayList<Object> rootItems = new ArrayList<Object>();
 
 		try
@@ -1372,7 +1455,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 		}
 
 		return rootItems;
@@ -1383,9 +1466,12 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * areChildrenAllowed(Object) == true ). It is also possible to detach a node from the hierarchy (and thus make it
 	 * root) by setting the parent null. This operation is optional.
 	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
 	public boolean setParent(Object entityId, Object newParentId)
 	{
+		logger.executionTrace();
+		
 		try
 		{
 			parentPropertyName = getParentPropertyName();
@@ -1397,7 +1483,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			}
 
 			final EntityItem<T> item = cache.get(entityId);
-			final Property<?> property = item.getItemProperty(parentPropertyName);
+			final Property property = item.getItemProperty(parentPropertyName);
 
 			property.setValue(newParentId);
 			final Object value = property.getValue();
@@ -1406,7 +1492,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 			return false;
 		}
 	}
@@ -1417,6 +1503,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean areChildrenAllowed(Object entityId)
 	{
+		logger.executionTrace();
+		
 		parentPropertyName = getParentPropertyName();
 		return (parentPropertyName != null && containsId(entityId));
 	}
@@ -1433,6 +1521,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean setChildrenAllowed(Object entityId, boolean areChildrenAllowed)
 	{
+		logger.executionTrace();
+		
 		return false;
 	}
 
@@ -1444,6 +1534,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean isRoot(Object entityId)
 	{
+		logger.executionTrace();
+		
 		try
 		{
 			parentPropertyName = getParentPropertyName();
@@ -1462,7 +1554,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 			return false;
 		}
 	}
@@ -1476,6 +1568,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public boolean hasChildren(Object entityId)
 	{
+		logger.executionTrace();
+		
 		try
 		{
 			parentPropertyName = getParentPropertyName();
@@ -1500,7 +1594,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 		catch (Exception e)
 		{
-			logger.error(unwindStack(e));
+			logger.error(e);
 			return false;
 		}
 	}
@@ -1511,6 +1605,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public void addItemSetChangeListener(ItemSetChangeListener listener)
 	{
+		logger.executionTrace();
+		
 		if (itemSetChangeListeners == null)
 			itemSetChangeListeners = new LinkedList<ItemSetChangeListener>();
 
@@ -1523,6 +1619,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public void removeItemSetChangeListener(ItemSetChangeListener listener)
 	{
+		logger.executionTrace();
+		
 		if (itemSetChangeListeners != null)
 			itemSetChangeListeners.remove(listener);
 	}
@@ -1535,6 +1633,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Deprecated
 	public void addListener(ItemSetChangeListener listener)
 	{
+		logger.executionTrace();
+		
 		addItemSetChangeListener(listener);
 	}
 
@@ -1546,6 +1646,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Deprecated
 	public void removeListener(ItemSetChangeListener listener)
 	{
+		logger.executionTrace();
+		
 		removeItemSetChangeListener(listener);
 	}
 
@@ -1558,6 +1660,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	private boolean propertyInEmbeddedKey(Object propertyId)
 	{
+		logger.executionTrace();
+		
 		if (embeddedPropertiesCache.containsKey(propertyId))
 			return embeddedPropertiesCache.get(propertyId);
 
@@ -1580,6 +1684,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	private void fireItemSetChange()
 	{
+		logger.executionTrace();
+		
 		if (itemSetChangeListeners != null)
 		{
 			final Object[] changeListeners = itemSetChangeListeners.toArray();
@@ -1607,6 +1713,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	private Criteria getCriteria()
 	{
+		logger.executionTrace();
+		
 		final Criteria criteria = getBaseCriteria();
 		final List<Order> orders = getOrder(!normalOrder);
 
@@ -1624,6 +1732,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	protected final List<Order> getOrder(boolean flipOrder)
 	{
+		logger.executionTrace();
+		
 		final List<Order> orders = new ArrayList<Order>();
 		orders.addAll(getDefaultOrder(flipOrder));
 		orders.add(getNaturalOrder(flipOrder));
@@ -1637,6 +1747,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	protected List<Order> getDefaultOrder(boolean flipOrder)
 	{
+		logger.executionTrace();
+		
 		final List<Order> orders = new ArrayList<Order>();
 
 		if (orderPropertyIds != null)
@@ -1669,6 +1781,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	protected Criteria getBaseCriteria()
 	{
+		logger.executionTrace();
+		
 		final Session session = sessionFactory.getCurrentSession();
 		Criteria criteria = session.createCriteria(entityType);
 
@@ -1695,6 +1809,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	protected Order getNaturalOrder(boolean flipOrder)
 	{
+		logger.executionTrace();
+		
 		final String propertyName = getIdPropertyName();
 
 		return (flipOrder)
@@ -1707,6 +1823,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	protected Object firstItemId(boolean bypassCache)
 	{
+		logger.executionTrace();
+		
 		if (bypassCache)
 		{
 			final Object first = getCriteria().setMaxResults(1).setCacheable(true).uniqueResult();
@@ -1723,6 +1841,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	private Object getIdForPojo(Object pojo)
 	{
+		logger.executionTrace();
+		
 		final Session session = sessionFactory.getCurrentSession();
 		return classMetadata.getIdentifier(pojo, (SessionImplementor) session);
 	}
@@ -1733,6 +1853,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	private List<T> getRowBuffer()
 	{
+		logger.executionTrace();
+		
 		return (normalOrder) ? ascRowBuffer : descRowBuffer;
 	}
 
@@ -1742,6 +1864,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	private void setRowBuffer(List<T> list, int firstIndex)
 	{
+		logger.executionTrace();
+		
 		if (normalOrder)
 		{
 			ascRowBuffer = list;
@@ -1768,6 +1892,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	private String getIdPropertyName()
 	{
+		logger.executionTrace();
+		
 		return classMetadata.getIdentifierPropertyName();
 	}
 
@@ -1777,6 +1903,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@SuppressWarnings("unchecked")
 	private void resetIndexRowBuffer(int index)
 	{
+		logger.executionTrace();
+		
 		indexRowBufferFirstIndex = index;
 		indexRowBuffer = getCriteria().setFirstResult(index).setMaxResults(ROW_BUF_SIZE).list();
 	}
@@ -1786,6 +1914,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	private int slowIndexOfId(Object entityId)
 	{
+		logger.executionTrace();
+		
 		final Criteria criteria = getCriteria().setProjection(Projections.id());
 		final List<?> list = criteria.list();
 		return list.indexOf(entityId);
@@ -1797,6 +1927,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	public void addContainerFilter(Object propertyId, String filterString, boolean ignoreCase, boolean onlyMatchPrefix)
 	{
+		logger.executionTrace();
+		
 		addContainerFilter(new StringContainerFilter(propertyId, filterString, ignoreCase, onlyMatchPrefix));
 	}
 
@@ -1805,6 +1937,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	public void addContainerFilter(ContainerFilter containerFilter)
 	{
+		logger.executionTrace();
+		
 		if (addedProperties.containsKey(containerFilter.getPropertyId()))
 		{
 			final String message = "HbnContainer does not support filtering properties not mapped by Hibernate";
@@ -1825,6 +1959,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	public void removeContainerFilters(Object propertyId)
 	{
+		logger.executionTrace();
+		
 		if (filters != null)
 		{
 			for (Iterator<ContainerFilter> iterator = filters.iterator(); iterator.hasNext();)
@@ -1846,6 +1982,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	@Override
 	public void removeContainerFilter(Filter filter)
 	{
+		logger.executionTrace();
+		
 		// TODO support new filtering api properly
 		// TODO the workaround for SimpleStringFilter works wrong, but hopefully will be good enough for now
 
@@ -1863,6 +2001,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	private String getParentPropertyName()
 	{
+		logger.executionTrace();
+		
 		// TODO: make this a little more robust, there are a number of cases where this will fail.
 
 		if (parentPropertyName == null)
@@ -1890,6 +2030,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 */
 	protected void clearInternalCache()
 	{
+		logger.executionTrace();
+		
 		idToIndex.clear();
 		indexRowBuffer = null;
 		ascRowBuffer = null;

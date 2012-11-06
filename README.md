@@ -1,5 +1,5 @@
-HbnContainer 2.0.0
-==================
+HbnContainer 2.0
+================
 
 [HbnContainer](https://vaadin.com/directory#addon/hbncontainer) is a data connector for [Vaadin](http://vaadin.com) based on the popular [Hibernate ORM from JBoss](http://www.hibernate.org/). It is distributed as a Vaadin Add-on and it is used for binding entities with database records to feed components like  tables, forms and trees. It has remained in the top 10 most downloaded data components from the [Vaadin Add-on Directory](https://vaadin.com/directory) for a long time.
 
