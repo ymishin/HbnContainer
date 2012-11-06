@@ -1082,7 +1082,14 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	{
 		logger.executionTrace();
 		
-		firstId = firstItemId(true);
+		final Object firstPojo = getCriteria()
+				.setMaxResults(1)
+				.setCacheable(true)
+				.uniqueResult();
+		
+		firstId = getIdForPojo(firstPojo);
+		idToIndex.put(firstId, normalOrder ? 0 : size() - 1);
+		
 		return firstId;
 	}
 
@@ -1093,7 +1100,6 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	public boolean isFirstId(Object entityId)
 	{
 		logger.executionTrace();
-		
 		return entityId.equals(firstItemId());
 	}
 
@@ -1118,7 +1124,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		if (lastId == null)
 		{
 			normalOrder = !normalOrder;
-			lastId = firstItemId(true);
+			lastId = firstItemId();
 			normalOrder = !normalOrder;
 		}
 
@@ -1816,24 +1822,6 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		return (flipOrder)
 				? Order.desc(propertyName)
 				: Order.asc(propertyName);
-	}
-
-	/**
-	 * This is an internal HbnContainer utility method to implement {@link #firstItemId()} and {@link #lastItemId()}.
-	 */
-	protected Object firstItemId(boolean bypassCache)
-	{
-		logger.executionTrace();
-		
-		if (bypassCache)
-		{
-			final Object first = getCriteria().setMaxResults(1).setCacheable(true).uniqueResult();
-			final Object entityId = getIdForPojo(first);
-			idToIndex.put(entityId, normalOrder ? 0 : size() - 1);
-			return entityId;
-		}
-
-		return firstItemId();
 	}
 
 	/**
