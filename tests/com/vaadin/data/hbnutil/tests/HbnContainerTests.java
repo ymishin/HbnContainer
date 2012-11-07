@@ -1,9 +1,18 @@
 package com.vaadin.data.hbnutil.tests;
 
 import static org.junit.Assert.*;
+
+import java.util.List;
+import java.util.Set;
+
 import org.hibernate.*;
 import org.junit.*;
+
+import com.vaadin.data.Container.Filter;
+import com.vaadin.data.Container.ItemSetChangeEvent;
+import com.vaadin.data.Container.ItemSetChangeListener;
 import com.vaadin.data.hbnutil.*;
+import com.vaadin.data.util.filter.SimpleStringFilter;
 
 public class HbnContainerTests
 {
@@ -105,5 +114,126 @@ public class HbnContainerTests
 		
 		final boolean removed = container.removeItem(entityId);
 		assertTrue(removed); 
+	}
+	
+	@Test
+	public final void testAddItemSetChangeListener()
+	{
+		@SuppressWarnings("serial")
+		final ItemSetChangeListener listener = new ItemSetChangeListener()
+		{
+			@Override
+			public void containerItemSetChange(ItemSetChangeEvent event)
+			{
+			}
+		};
+		
+		container.addItemSetChangeListener(listener);
+		
+		List<ItemSetChangeListener> listeners = container.getItemSetChangeListeners();
+		assertTrue(listeners.contains(listener));
+		
+		container.removeItemSetChangeListener(listener);
+	}
+
+	@Test
+	public final void testRemoveItemSetChangeListener()
+	{
+		@SuppressWarnings("serial")
+		final ItemSetChangeListener listener = new ItemSetChangeListener()
+		{
+			@Override
+			public void containerItemSetChange(ItemSetChangeEvent event)
+			{
+			}
+		};
+
+		container.addItemSetChangeListener(listener);
+		container.removeItemSetChangeListener(listener);
+
+		List<ItemSetChangeListener> listeners = container.getItemSetChangeListeners();
+		assertTrue(!listeners.contains(listener));
+	}
+
+	@SuppressWarnings("deprecation")
+	@Test
+	public final void testAddListener()
+	{
+		@SuppressWarnings("serial")
+		final ItemSetChangeListener listener = new ItemSetChangeListener()
+		{
+			@Override
+			public void containerItemSetChange(ItemSetChangeEvent event)
+			{
+			}
+		};
+		
+		container.addListener(listener);
+		
+		List<ItemSetChangeListener> listeners = container.getItemSetChangeListeners();
+		assertTrue(listeners.contains(listener));
+		
+		container.removeListener(listener);
+	}
+
+	@SuppressWarnings("deprecation")
+	@Test
+	public final void testRemoveListener()
+	{
+		@SuppressWarnings("serial")
+		final ItemSetChangeListener listener = new ItemSetChangeListener()
+		{
+			@Override
+			public void containerItemSetChange(ItemSetChangeEvent event)
+			{
+			}
+		};
+		
+		container.addListener(listener);
+		container.removeListener(listener);
+
+		List<ItemSetChangeListener> listeners = container.getItemSetChangeListeners();
+		assertTrue(!listeners.contains(listener));
+	}
+
+	@Test
+	public final void testAddContainerFilter()
+	{
+		final ContainerFilter filter = new StringContainerFilter("title", "abc", true, false);
+		container.addContainerFilter(filter);
+		
+		Set<ContainerFilter> filters = container.getContainerFilters();
+		assertTrue(filters.contains(filter));
+		
+		container.removeAllContainerFilters();
+	}
+
+	@Test
+	public final void testRemoveContainerFilters()
+	{
+		final ContainerFilter filter = new StringContainerFilter("title", "abc", true, false);
+		container.addContainerFilter(filter);
+		
+		Set<ContainerFilter> filters = container.getContainerFilters();
+		assertTrue(filters.contains(filter));
+		
+		container.removeContainerFilters("title");
+		
+		filters = container.getContainerFilters();
+		assertTrue(!filters.contains(filter));
+	}
+
+	@Test
+	public final void testAddFilter()
+	{
+		final Filter filter = new SimpleStringFilter("title", "abc", true, false);
+		container.addContainerFilter(filter);
+		
+		Set<ContainerFilter> filters = container.getContainerFilters();
+		assertTrue(filters.size() == 1); // lame
+		
+		container.removeAllContainerFilters();
+		filters = container.getContainerFilters();
+		assertTrue(filters == null);
 	}
 }
