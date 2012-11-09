@@ -54,6 +54,7 @@ public class ContainerHierarchicalTests
 	@Test
 	public final void testGetChildren()
 	{
+		container.removeAllItems();
 		HibernateUtil.insertExampleNodes(recordsToLoad);
 		
 		Collection<?> rootEntityIds = container.rootItemIds();

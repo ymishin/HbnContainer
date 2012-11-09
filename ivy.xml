@@ -1,31 +1,20 @@
 <?xml version="1.0"?>
 <!DOCTYPE ivy-module [
-	<!ENTITY vaadin.version "7.0.0.beta7">
+	<!ENTITY vaadin.version "6.8.5">
 	<!ENTITY guava.version "13.0.1">
 	<!ENTITY hibernate.version "4.1.7.Final">
 	<!ENTITY slf4j.version "1.6.6">
 	<!ENTITY log4j.version "1.2.17">
 	<!ENTITY hsqldb.version "2.2.8">
 ]>
-
-<ivy-module version="2.0"
-     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-      xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd">
-
+<ivy-module version="2.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://ant.apache.org/ivy/schemas/ivy.xsd">
     <info organisation="com.vaadin.data.hbnutil" module="HbnContainer" />
-    
 	<configurations>
 		<conf name="default" />
-		<conf name="widgetset-compile" />
 	</configurations>
-
 	<dependencies>
 		<!-- Vaadin -->
-		<dependency org="com.vaadin" name="vaadin-server" rev="&vaadin.version;" conf="default->default" />
-		<dependency org="com.vaadin" name="vaadin-themes" rev="&vaadin.version;" />
-		<dependency org="com.vaadin" name="vaadin-client-compiled" rev="&vaadin.version;" />
-		<dependency org="com.vaadin" name="vaadin-client" rev="&vaadin.version;" />
-		<dependency org="com.vaadin" name="vaadin-client-compiler" rev="&vaadin.version;" conf="widgetset-compile->default" />
+		<dependency org="com.vaadin" name="vaadin" rev="&vaadin.version;" />
 		
 		<!-- Google Guava Jars -->
 		<dependency org="com.google.guava" name="guava" rev="&guava.version;"/>

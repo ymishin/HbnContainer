@@ -99,7 +99,7 @@ public class ContainerTests
 
 		container.updateEntity(entity);
 		
-		Property<?> property = container.getContainerProperty(entityId, "title");
+		Property property = container.getContainerProperty(entityId, "title");
 		final String propertyValue = (String) property.getValue();
 		assertTrue(propertyValue == "zzz");
 	}

@@ -155,7 +155,6 @@ public class HbnContainerTests
 		assertTrue(!listeners.contains(listener));
 	}
 
-	@SuppressWarnings("deprecation")
 	@Test
 	public final void testAddListener()
 	{
@@ -176,7 +175,6 @@ public class HbnContainerTests
 		container.removeListener(listener);
 	}
 
-	@SuppressWarnings("deprecation")
 	@Test
 	public final void testRemoveListener()
 	{

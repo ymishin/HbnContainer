@@ -1,5 +1,5 @@
 /*
- * Copyright 2012, Gary Piercey, All Rights Reserved.
+ * Copyright 2012-2013, Gary Piercey, All Rights Reserved.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
@@ -52,7 +52,6 @@ import com.vaadin.data.Item;
 import com.vaadin.data.Property;
 import com.vaadin.data.hbnutil.HbnContainer.EntityItem.EntityProperty;
 import com.vaadin.data.util.MethodProperty;
-import com.vaadin.data.util.converter.Converter.ConversionException;
 import com.vaadin.data.util.filter.SimpleStringFilter;
 import com.vaadin.data.util.filter.UnsupportedFilterException;
 
@@ -104,7 +103,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		 * Instantiated properties of this EntityItem. May be either EntityItemProperty (hibernate field) or manually
 		 * added container property (MethodProperty).
 		 */
-		protected Map<Object, Property<?>> properties = new HashMap<Object, Property<?>>();
+		protected Map<Object, Property> properties = new HashMap<Object, Property>();
 
 		@SuppressWarnings("unchecked")
 		public EntityItem(Serializable id)
@@ -128,7 +127,6 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			return pojo;
 		}
 
-		@SuppressWarnings("rawtypes")
 		public boolean addItemProperty(Object id, Property property) throws UnsupportedOperationException
 		{
 			logger.executionTrace();
@@ -137,11 +135,11 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			return true;
 		}
 
-		public Property<?> getItemProperty(Object id)
+		public Property getItemProperty(Object id)
 		{
 			logger.executionTrace();
 
-			Property<?> p = properties.get(id);
+			Property p = properties.get(id);
 			if (p == null)
 			{
 				p = new EntityProperty(id.toString());
@@ -161,7 +159,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		{
 			logger.executionTrace();
 
-			Property<?> removed = properties.remove(id);
+			Property removed = properties.remove(id);
 			return removed != null;
 		}
 
@@ -182,7 +180,6 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		 * The Property.editor interface should be implemented if the value needs to be changed through the implementing
 		 * class.
 		 */
-		@SuppressWarnings("rawtypes")
 		public class EntityProperty implements Property, Property.ValueChangeNotifier
 		{
 			private static final long serialVersionUID = -4086774943938055297L;
@@ -457,22 +454,20 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			/**
 			 * This method registers a new value change listener for this property.
 			 */
-			@Override
+			//@Override
 			public void addValueChangeListener(ValueChangeListener listener)
 			{
 				logger.executionTrace();
-
 				addListener(listener);
 			}
 
 			/**
 			 * This method removes a previously registered value change listener.
 			 */
-			@Override
+			//@Override
 			public void removeValueChangeListener(ValueChangeListener listener)
 			{
 				logger.executionTrace();
-
 				removeListener(listener);
 			}
 
@@ -588,7 +583,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			{
 				private static final long serialVersionUID = 166764621324404579L;
 
-				public Property<?> getProperty()
+				public Property getProperty()
 				{
 					return EntityProperty.this;
 				}
@@ -701,7 +696,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		{
 			for (Object propertyId : cachedEntity.getItemPropertyIds())
 			{
-				Property<?> cachedProperty = cachedEntity.getItemProperty(propertyId);
+				Property cachedProperty = cachedEntity.getItemProperty(propertyId);
 				if (cachedProperty instanceof EntityItem.EntityProperty)
 				{
 					@SuppressWarnings("rawtypes")
@@ -804,14 +799,14 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * contain the item or it is filtered out, or the Container does not have the Property, null is returned.
 	 */
 	@Override
-	public Property<?> getContainerProperty(Object entityId, Object propertyId)
+	public Property getContainerProperty(Object entityId, Object propertyId)
 	{
 		logger.executionTrace();
 
 		try
 		{
 			EntityItem<?> entity = cache.get(entityId);
-			Property<?> property = entity.getItemProperty(propertyId);
+			Property property = entity.getItemProperty(propertyId);
 			return property;
 		}
 		catch (Exception e)
@@ -910,7 +905,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * 
 	 * startIndex to max(startIndex + (numberOfItems-1), container.size()-1).
 	 */
-	@Override
+	//@Override
 	public List<?> getItemIds(int startIndex, int count)
 	{
 		logger.executionTrace();
@@ -1380,7 +1375,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			for (Object id : getItemIds())
 			{
 				EntityItem<T> entity = cache.get(id);
-				Property<?> property = entity.getItemProperty(parentPropertyName);
+				Property property = entity.getItemProperty(parentPropertyName);
 				Object value = property.getValue();
 
 				if (entityId.equals(value))
@@ -1415,7 +1410,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			}
 
 			final EntityItem<T> entity = cache.get(entityId);
-			final Property<?> property = entity.getItemProperty(parentPropertyName);
+			final Property property = entity.getItemProperty(parentPropertyName);
 			final Object value = property.getValue();
 
 			return value;
@@ -1453,7 +1448,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			for (Object id : allItemIds)
 			{
 				EntityItem<T> entity = cache.get(id);
-				Property<?> property = entity.getItemProperty(parentPropertyName);
+				Property property = entity.getItemProperty(parentPropertyName);
 				Object value = property.getValue();
 
 				if (value == null)
@@ -1473,7 +1468,6 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * areChildrenAllowed(Object) == true ). It is also possible to detach a node from the hierarchy (and thus make it
 	 * root) by setting the parent null. This operation is optional.
 	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
 	public boolean setParent(Object entityId, Object newParentId)
 	{
@@ -1556,7 +1550,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			}
 
 			final EntityItem<T> item = cache.get(entityId);
-			final Property<?> property = item.getItemProperty(parentPropertyName);
+			final Property property = item.getItemProperty(parentPropertyName);
 			final Object value = property.getValue();
 
 			return (value == null);
@@ -1592,7 +1586,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 			for (Object id : getItemIds())
 			{
 				EntityItem<T> item = cache.get(id);
-				Property<?> property = item.getItemProperty(parentPropertyName);
+				Property property = item.getItemProperty(parentPropertyName);
 				Object value = property.getValue();
 
 				if (entityId.equals(value))
@@ -1611,7 +1605,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	/**
 	 * Adds an Item set change listener for the object.
 	 */
-	@Override
+	//@Override
 	public void addItemSetChangeListener(ItemSetChangeListener listener)
 	{
 		logger.executionTrace();
@@ -1625,7 +1619,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	/**
 	 * Removes the Item set change listener from the object.
 	 */
-	@Override
+	//@Override
 	public void removeItemSetChangeListener(ItemSetChangeListener listener)
 	{
 		logger.executionTrace();
@@ -1639,11 +1633,14 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * addItemSetChangeListener() instead.
 	 */
 	@Override
-	@Deprecated
 	public void addListener(ItemSetChangeListener listener)
 	{
 		logger.executionTrace();
-		addItemSetChangeListener(listener);
+
+		if (itemSetChangeListeners == null)
+			itemSetChangeListeners = new LinkedList<ItemSetChangeListener>();
+
+		itemSetChangeListeners.add(listener);
 	}
 
 	/**
@@ -1651,11 +1648,12 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	 * addItemSetChangeListener() instead.
 	 */
 	@Override
-	@Deprecated
 	public void removeListener(ItemSetChangeListener listener)
 	{
 		logger.executionTrace();
-		removeItemSetChangeListener(listener);
+		
+		if (itemSetChangeListeners != null)
+			itemSetChangeListeners.remove(listener);
 	}
 
 	//
