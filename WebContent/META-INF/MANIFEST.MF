@@ -1,6 +1,6 @@
 Manifest-Version: 1.0
 Implementation-Title: HbnContainer
-Implementation-Version: 2.0.1
+Implementation-Version: 2.0.1-CUSTOM-V7-H3-WORKFLOW
 Vaadin-Package-Version: 1
 Class-Path: 
 
