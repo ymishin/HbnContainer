@@ -39,7 +39,7 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Projections;
-import org.hibernate.engine.spi.SessionImplementor;
+import org.hibernate.engine.SessionImplementor;
 import org.hibernate.metadata.ClassMetadata;
 import org.hibernate.type.ComponentType;
 import org.hibernate.type.Type;
@@ -233,7 +233,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 				}
 
 				final Type propertyType = getPropertyType();
-				final Object propertyValue = classMetadata.getPropertyValue(pojo, propertyName);
+				final Object propertyValue = classMetadata.getPropertyValue(pojo, propertyName, EntityMode.POJO);
 
 				if (!propertyType.isAssociationType())
 					return propertyValue;
@@ -363,12 +363,12 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 
 								@SuppressWarnings("unchecked")
 								Collection<Object> pojoCollection = (Collection<Object>) classMetadata
-										.getPropertyValue(pojo, propertyName);
+										.getPropertyValue(pojo, propertyName, EntityMode.POJO);
 
 								if (pojoCollection == null)
 								{
 									pojoCollection = new HashSet<Object>();
-									classMetadata.setPropertyValue(pojo, propertyName, pojoCollection);
+									classMetadata.setPropertyValue(pojo, propertyName, pojoCollection, EntityMode.POJO);
 								}
 
 								final Collection<Object> orphans = new HashSet<Object>(pojoCollection);
@@ -399,13 +399,13 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 										.getCurrentSession()
 										.get(referencedType, (Serializable) value);
 
-								classMetadata.setPropertyValue(pojo, propertyName, object);
+								classMetadata.setPropertyValue(pojo, propertyName, object, EntityMode.POJO);
 								sessionFactory.getCurrentSession().merge(object);
 								sessionFactory.getCurrentSession().saveOrUpdate(pojo);
 							}
 							else
 							{
-								classMetadata.setPropertyValue(pojo, propertyName, value);
+								classMetadata.setPropertyValue(pojo, propertyName, value, EntityMode.POJO);
 							}
 						}
 
