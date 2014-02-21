@@ -51,9 +51,11 @@ import com.vaadin.data.Container;
 import com.vaadin.data.Item;
 import com.vaadin.data.Property;
 import com.vaadin.data.hbnutil.HbnContainer.EntityItem.EntityProperty;
+import com.vaadin.data.hbnutil.filter.ContainerFilter;
+import com.vaadin.data.hbnutil.filter.FilterFactory;
+import com.vaadin.data.hbnutil.filter.StringContainerFilter;
 import com.vaadin.data.util.MethodProperty;
 import com.vaadin.data.util.converter.Converter.ConversionException;
-import com.vaadin.data.util.filter.SimpleStringFilter;
 import com.vaadin.data.util.filter.UnsupportedFilterException;
 
 public class HbnContainer<T> implements Container, Container.Indexed, Container.Sortable,
@@ -80,7 +82,7 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	private Object[] orderPropertyIds;
 	private Integer size;
 	private LinkedList<ItemSetChangeListener> itemSetChangeListeners;
-	private HashSet<ContainerFilter> filters;
+	private Set<ContainerFilter> filters;
 	private final Map<String, Class<?>> addedProperties = new HashMap<String, Class<?>>();
 	private final LoadingCache<Object, EntityItem<T>> cache;
 	private final HashMap<Object, Boolean> embeddedPropertiesCache = new HashMap<Object, Boolean>();
@@ -1333,31 +1335,19 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
-	 * HbnContainer only supports old style addContainerFilter(Object, String, boolean booblean) API and
-	 * {@link SimpleStringFilter}. Support for this newer API maybe in upcoming versions.
+	 * Adds a filter for the container
 	 * 
-	 * Also note that for complex filtering it is possible to override {@link #getBaseCriteria()} method and add filter
+	 * Note that for complex filtering it is possible to override {@link #getBaseCriteria()} method and add filter
 	 * so the query directly.
 	 */
-	// TODO support new filtering api properly
 	@Override
 	public void addContainerFilter(Filter filter) throws UnsupportedFilterException
 	{
 		logger.executionTrace();
 
-		if (!(filter instanceof SimpleStringFilter))
-		{
-			final String message = "HbnContainer only supports old style addContainerFilter(Object, String, boolean booblean) API";
-			throw new UnsupportedFilterException(message);
-		}
+		final ContainerFilter containerFilter = FilterFactory.getContainerFilter(filter);
 
-		final SimpleStringFilter sf = (SimpleStringFilter) filter;
-		final String filterString = sf.getFilterString();
-		final Object propertyId = sf.getPropertyId();
-		final boolean ignoreCase = sf.isIgnoreCase();
-		final boolean onlyMatchPrefix = sf.isOnlyMatchPrefix();
-
-		addContainerFilter(propertyId, filterString, ignoreCase, onlyMatchPrefix);
+		addContainerFilter(containerFilter);
 	}
 
 	/**
@@ -1938,6 +1928,39 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	}
 
 	/**
+	 * Clears all filters present in filters which have the same property id as
+	 * that set in containerFilter
+	 * 
+	 * @param containerFilter
+	 *            the filter which will be used to filter filters
+	 * @param filters
+	 *            set of filters to filter
+	 * @return A filtered set of ContainerFilters where there are no filters
+	 *         with the same property ID as the one in containerFilter
+	 */
+	/*
+	 * TODO: is this really necessary? Enums do not work properly in tables
+	 * without this, but those may have to be better handled somewhere else
+	 */
+	private Set<ContainerFilter> filterFilters(
+			final ContainerFilter containerFilter,
+			final Set<ContainerFilter> filters)
+	{
+		final HashSet<ContainerFilter> filtered = new HashSet<ContainerFilter>();
+
+		final Object propertyId = containerFilter.getPropertyId();
+		for (ContainerFilter filter : filters)
+		{
+			if (!propertyId.equals(filter.getPropertyId()))
+			{
+				filtered.add(filter);
+			}
+		}
+
+		return filtered;
+	}
+
+	/**
 	 * This is an internal HbnContainer utility method that adds a container filter.
 	 */
 	public void addContainerFilter(ContainerFilter containerFilter)
@@ -1952,6 +1975,8 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 
 		if (filters == null)
 			filters = new HashSet<ContainerFilter>();
+
+		filters = filterFilters(containerFilter, filters);
 
 		filters.add(containerFilter);
 
@@ -1989,15 +2014,10 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 	{
 		logger.executionTrace();
 
-		// TODO support new filtering api properly
-		// TODO the workaround for SimpleStringFilter works wrong, but hopefully will be good enough for now
+		final ContainerFilter containerFilter = FilterFactory.getContainerFilter(filter);
+		filters.remove(containerFilter);
 
-		if (filter instanceof SimpleStringFilter)
-		{
-			final SimpleStringFilter sf = (SimpleStringFilter) filter;
-			final Object propertyId = sf.getPropertyId();
-			removeContainerFilters(propertyId);
-		}
+		fireItemSetChange();
 	}
 
 	/**

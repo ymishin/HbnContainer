@@ -11,7 +11,7 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package com.vaadin.data.hbnutil;
+package com.vaadin.data.hbnutil.filter;
 
 import org.hibernate.criterion.Criterion;
 
@@ -33,8 +33,37 @@ public abstract class ContainerFilter
 
 	public Criterion getCriterion(String idName)
 	{
-		return (idName == null)
-				? getFieldCriterion(getPropertyId().toString())
+		return (idName == null) ? getFieldCriterion(getPropertyId().toString())
 				: getFieldCriterion(idName + "." + getPropertyId());
 	}
+
+	@Override
+	public int hashCode()
+	{
+		final int prime = 31;
+		int result = 1;
+		result = prime * result
+				+ ((propertyId == null) ? 0 : propertyId.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj)
+	{
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ContainerFilter other = (ContainerFilter) obj;
+		if (propertyId == null)
+		{
+			if (other.propertyId != null)
+				return false;
+		} else if (!propertyId.equals(other.propertyId))
+			return false;
+		return true;
+	}
+
 }

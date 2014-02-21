@@ -11,7 +11,7 @@
  * specific language governing permissions and limitations under the License.
  */
 
-package com.vaadin.data.hbnutil;
+package com.vaadin.data.hbnutil.filter;
 
 import org.hibernate.criterion.Criterion;
 import org.hibernate.criterion.MatchMode;
@@ -37,4 +37,40 @@ public class StringContainerFilter extends ContainerFilter
 				: MatchMode.ANYWHERE) : Restrictions.like(fullPropertyName, filterString,
 				onlyMatchPrefix ? MatchMode.START : MatchMode.ANYWHERE);
 	}
+
+	@Override
+	public int hashCode()
+	{
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result
+				+ ((filterString == null) ? 0 : filterString.hashCode());
+		result = prime * result + (ignoreCase ? 1231 : 1237);
+		result = prime * result + (onlyMatchPrefix ? 1231 : 1237);
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj)
+	{
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		StringContainerFilter other = (StringContainerFilter) obj;
+		if (filterString == null)
+		{
+			if (other.filterString != null)
+				return false;
+		} else if (!filterString.equals(other.filterString))
+			return false;
+		if (ignoreCase != other.ignoreCase)
+			return false;
+		if (onlyMatchPrefix != other.onlyMatchPrefix)
+			return false;
+		return true;
+	}
+
 }
