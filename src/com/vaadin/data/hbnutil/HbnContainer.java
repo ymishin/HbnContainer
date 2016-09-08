@@ -1510,6 +1510,21 @@ public class HbnContainer<T> implements Container, Container.Indexed, Container.
 		}
 	}
 
+	public void setContainerFilter(ContainerFilter containerFilter)
+	{		
+		if (addedProperties.containsKey(containerFilter.getPropertyId()))
+		{
+			throw new UnsupportedOperationException("HbnContainer does not support filterig properties not mapped by Hibernate");
+		}
+		else
+		{
+			filters = new HashSet<ContainerFilter>();
+			filters.add(containerFilter);
+			clearInternalCache();
+			fireItemSetChange();
+		}
+	}	
+
 	public void removeContainerFilters(Object propertyId)
 	{
 		if (filters != null)
